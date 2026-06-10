@@ -12,6 +12,10 @@ Lightweight tennis group scoring app on **Cloudflare Pages + D1**.
 - **API:** Hono on Cloudflare Pages Functions (`functions/`, `src/`)
 - **Database:** Cloudflare D1 (SQLite)
 
+## Requirements
+
+- **Node.js 22+** (see `.nvmrc` — `nvm use` or `fnm use`)
+
 ## Local Development
 
 ```bash
