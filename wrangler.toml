@@ -5,4 +5,4 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "wacta-scoring"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "3c073d9f-e205-468d-bf92-d0815aaaa247"
