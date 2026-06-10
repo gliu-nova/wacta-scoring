@@ -2,6 +2,7 @@ export type Env = {
   DB: D1Database;
   SECRET_KEY?: string;
   SUBMIT_PASSWORD?: string;
+  EXPORT_TOKEN?: string;
 };
 
 export type UserRole = "admin" | "captain" | "player";

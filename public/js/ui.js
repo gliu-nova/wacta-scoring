@@ -53,3 +53,12 @@ export function alert(el, msg, type = "error") {
   el.textContent = msg;
   el.hidden = false;
 }
+
+export function downloadCsv(path) {
+  const a = document.createElement("a");
+  a.href = API + path;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
