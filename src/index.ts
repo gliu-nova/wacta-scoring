@@ -14,7 +14,11 @@ const app = new Hono<{ Bindings: Env }>().basePath("/api");
 app.use("*", cors({ origin: "*", credentials: true }));
 app.use("*", async (c, next) => { await ensureTables(c.env.DB); await next(); });
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", (c) => c.json({
+  ok: true,
+  environment: c.env.ENVIRONMENT ?? "unknown",
+  app: c.env.APP_NAME ?? "WACTA Scoring",
+}));
 
 app.route("/auth", auth);
 app.route("/admin", admin);

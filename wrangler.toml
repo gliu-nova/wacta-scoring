@@ -1,8 +1,23 @@
+# Must match your Cloudflare Pages project name (currently "wacta-scoring")
 name = "wacta-scoring"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-06-10"
 pages_build_output_dir = "public"
 
+# D1 Database binding — access in code as env.DB
 [[d1_databases]]
 binding = "DB"
 database_name = "wacta-scoring"
 database_id = "3c073d9f-e205-468d-bf92-d0815aaaa247"
+
+# Non-secret environment variables (available in Pages Functions as env.VAR_NAME)
+[vars]
+ENVIRONMENT = "production"
+APP_NAME = "Tennis Scores Tracker"
+
+# Preview deployments (non-main branches) use these overrides
+[env.preview.vars]
+ENVIRONMENT = "preview"
+
+# Secrets (SECRET_KEY, EXPORT_TOKEN) — set in Cloudflare Dashboard or via:
+#   npx wrangler pages secret put SECRET_KEY --project-name=wacta-scoring
+# Do NOT commit secrets to this file.

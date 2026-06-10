@@ -9,7 +9,7 @@
     "dev": "wrangler pages dev public --d1=DB --local",
     "db:local": "wrangler d1 execute wacta-scoring --local --file=./migrations/0002_full_league.sql",
     "db:remote": "wrangler d1 execute wacta-scoring --remote --file=./migrations/0002_full_league.sql",
-    "deploy": "wrangler pages deploy public --project-name=wacta-scoring"
+    "deploy": "wrangler pages deploy public"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -1,5 +1,7 @@
 export type Env = {
   DB: D1Database;
+  ENVIRONMENT?: string;
+  APP_NAME?: string;
   SECRET_KEY?: string;
   SUBMIT_PASSWORD?: string;
   EXPORT_TOKEN?: string;
