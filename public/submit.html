@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Score — WACTA</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎾 WACTA Scores</h1>
+    <p>Record a match result</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/submit.html" class="active">Submit Score</a>
+      <a href="/players.html">Players</a>
+    </nav>
+  </header>
+  <main>
+    <div id="alert" hidden></div>
+    <div class="card">
+      <h2>New Match</h2>
+      <form id="form">
+        <label for="winner">Winner</label>
+        <select id="winner" required></select>
+
+        <label for="loser">Loser</label>
+        <select id="loser" required></select>
+
+        <label for="score">Score</label>
+        <input id="score" type="text" placeholder="e.g. 6-4, 6-3" required>
+
+        <label for="date">Match Date</label>
+        <input id="date" type="date" required>
+
+        <label for="notes">Notes (optional)</label>
+        <input id="notes" type="text" placeholder="e.g. Practice set, league match">
+
+        <label for="password">Submit Password (if required)</label>
+        <input id="password" type="password" placeholder="Leave blank if not configured">
+
+        <button class="btn" type="submit">Save Match</button>
+      </form>
+    </div>
+  </main>
+  <script type="module">
+    import { api, loadPlayers, showAlert, hideAlert, getStoredPassword, setStoredPassword } from "/js/app.js";
+
+    const alert = document.getElementById("alert");
+    const winner = document.getElementById("winner");
+    const loser = document.getElementById("loser");
+    document.getElementById("date").valueAsDate = new Date();
+
+    const pw = getStoredPassword();
+    if (pw) document.getElementById("password").value = pw;
+
+    loadPlayers(winner).then(() => { loser.innerHTML = winner.innerHTML; });
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideAlert(alert);
+      const password = document.getElementById("password").value;
+      if (password) setStoredPassword(password);
+      try {
+        await api("/matches", {
+          method: "POST",
+          body: JSON.stringify({
+            winner_id: Number(winner.value),
+            loser_id: Number(loser.value),
+            score: document.getElementById("score").value,
+            match_date: document.getElementById("date").value,
+            notes: document.getElementById("notes").value,
+            password,
+          }),
+        });
+        showAlert(alert, "Match saved! View it on the home page.", "success");
+        document.getElementById("score").value = "";
+        document.getElementById("notes").value = "";
+      } catch (err) {
+        showAlert(alert, err.message);
+      }
+    });
+  </script>
+</body>
+</html>

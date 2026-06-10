@@ -1,0 +1,8 @@
+name = "wacta-scoring"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wacta-scoring"
+database_id = "00000000-0000-0000-0000-000000000000"

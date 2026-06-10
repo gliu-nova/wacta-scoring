@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Players — WACTA</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎾 WACTA Scores</h1>
+    <p>Manage group players</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/submit.html">Submit Score</a>
+      <a href="/players.html" class="active">Players</a>
+    </nav>
+  </header>
+  <main>
+    <div id="alert" hidden></div>
+    <div class="card">
+      <h2>All Players</h2>
+      <div id="list"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2>Add Player</h2>
+      <form id="form">
+        <label for="name">Name</label>
+        <input id="name" type="text" placeholder="Full name" required>
+
+        <label for="ntrp">NTRP Rating</label>
+        <input id="ntrp" type="number" step="0.5" min="1" max="7" value="3.5">
+
+        <label for="password">Submit Password (if required)</label>
+        <input id="password" type="password" placeholder="Leave blank if not configured">
+
+        <button class="btn" type="submit">Add Player</button>
+      </form>
+    </div>
+  </main>
+  <script type="module">
+    import { api, showAlert, hideAlert, getStoredPassword, setStoredPassword, esc } from "/js/app.js";
+
+    const alert = document.getElementById("alert");
+    const list = document.getElementById("list");
+
+    const pw = getStoredPassword();
+    if (pw) document.getElementById("password").value = pw;
+
+    async function refresh() {
+      try {
+        const players = await api("/players");
+        if (!players.length) {
+          list.innerHTML = '<div class="empty">No players yet.</div>';
+          return;
+        }
+        list.innerHTML = `<table>
+          <thead><tr><th>Name</th><th>NTRP</th></tr></thead>
+          <tbody>${players.map((p) => `
+            <tr><td><strong>${esc(p.name)}</strong></td><td>${p.ntrp.toFixed(1)}</td></tr>`).join("")}
+          </tbody></table>`;
+      } catch (e) {
+        list.innerHTML = `<div class="alert alert-error">${esc(e.message)}</div>`;
+      }
+    }
+    refresh();
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideAlert(alert);
+      const password = document.getElementById("password").value;
+      if (password) setStoredPassword(password);
+      try {
+        await api("/players", {
+          method: "POST",
+          body: JSON.stringify({
+            name: document.getElementById("name").value,
+            ntrp: Number(document.getElementById("ntrp").value),
+            password,
+          }),
+        });
+        showAlert(alert, "Player added!", "success");
+        document.getElementById("name").value = "";
+        refresh();
+      } catch (err) {
+        showAlert(alert, err.message);
+      }
+    });
+  </script>
+</body>
+</html>

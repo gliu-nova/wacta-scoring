@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WACTA Tennis Scores</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎾 WACTA Scores</h1>
+    <p>Group leaderboard &amp; match history</p>
+    <nav>
+      <a href="/" class="active">Home</a>
+      <a href="/submit.html">Submit Score</a>
+      <a href="/players.html">Players</a>
+    </nav>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Leaderboard</h2>
+      <div id="leaderboard"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2>Recent Matches</h2>
+      <div id="matches"><div class="loading">Loading…</div></div>
+    </div>
+  </main>
+  <script type="module">
+    import { loadLeaderboard, loadMatches } from "/js/app.js";
+    loadLeaderboard(document.getElementById("leaderboard"));
+    loadMatches(document.getElementById("matches"));
+  </script>
+</body>
+</html>

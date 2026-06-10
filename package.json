@@ -1,0 +1,19 @@
+{
+  "name": "wacta-scoring",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public --d1=DB --local",
+    "db:local": "wrangler d1 execute wacta-scoring --local --file=./migrations/0001_init.sql",
+    "db:remote": "wrangler d1 execute wacta-scoring --remote --file=./migrations/0001_init.sql",
+    "deploy": "wrangler pages deploy public --project-name=wacta-scoring"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^3.109.0"
+  }
+}
