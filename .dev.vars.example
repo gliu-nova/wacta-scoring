@@ -1,2 +1,2 @@
-# Copy to .dev.vars for local dev (optional — leave unset for open submissions)
-SUBMIT_PASSWORD=your-secret-here
+SECRET_KEY=local-dev-secret
+SUBMIT_PASSWORD=

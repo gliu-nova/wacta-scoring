@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc } from "/js/ui.js";
+if ((await getUser())?.role !== "admin") location.href="/login.html";
+const [teams] = await Promise.all([api("/admin/teams")]);
+const tmap = Object.fromEntries(teams.map(t => [t.id, t.name]));
+page("Players", `<h1 class="text-2xl font-bold mb-4">Players</h1>
+<input id="q" placeholder="Search..." class="border rounded-lg px-3 py-2 mb-4 w-full max-w-xs">
+<div id="list" class="bg-white rounded-xl border mb-6"></div>
+<form id="form" class="flex flex-wrap gap-2 bg-white p-4 rounded-xl border items-end">
+<input name="first_name" required placeholder="First" class="border rounded px-2 py-1">
+<input name="last_name" required placeholder="Last" class="border rounded px-2 py-1">
+<input name="ntrp_rating" type="number" step="0.5" value="3.5" class="border rounded px-2 py-1 w-20">
+<select name="team_id" class="border rounded px-2 py-1"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
+async function load(q="") {
+  const players = await api("/admin/players"+(q?`?q=${encodeURIComponent(q)}`:""));
+  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Name</th><th class="p-3">NTRP</th><th class="p-3">Team</th></tr></thead><tbody>${
+    players.map(p => `<tr class="border-t"><td class="p-3"><a href="/player.html?id=${p.id}" class="text-emerald-700 font-medium">${esc(p.first_name)} ${esc(p.last_name)}</a></td>
+    <td class="p-3">${p.ntrp_rating.toFixed(1)}</td><td class="p-3 text-slate-500">${esc(tmap[p.team_id]||"—")}</td></tr>`).join("")}</tbody></table>`;
+}
+document.getElementById("q").oninput = (e) => load(e.target.value);
+document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
+  await api("/admin/players",{method:"POST",body:JSON.stringify({first_name:fd.get("first_name"),last_name:fd.get("last_name"),ntrp_rating:Number(fd.get("ntrp_rating")),team_id:fd.get("team_id")?Number(fd.get("team_id")):null})});
+  e.target.reset(); load(); };
+load();
+</script></body></html>

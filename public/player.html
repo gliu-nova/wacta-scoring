@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, page, esc } from "/js/ui.js";
+const id = new URLSearchParams(location.search).get("id");
+const d = await api("/players/"+id);
+const p = d.player;
+page(p.first_name+" "+p.last_name, `<a href="/players.html" class="text-emerald-600 text-sm">← Search</a>
+<h1 class="text-2xl font-bold mt-2">${esc(p.first_name)} ${esc(p.last_name)}</h1>
+<p class="text-slate-500 mb-6">NTRP ${p.ntrp_rating.toFixed(1)}${d.team?" · "+esc(d.team.name):""}</p>
+<div class="grid sm:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white p-4 rounded-xl border text-center"><div class="text-2xl font-bold text-green-700">${d.line_wins}</div><div class="text-xs text-slate-500">Line Wins</div></div>
+  <div class="bg-white p-4 rounded-xl border text-center"><div class="text-2xl font-bold text-red-600">${d.line_losses}</div><div class="text-xs text-slate-500">Line Losses</div></div>
+  <div class="bg-white p-4 rounded-xl border text-center"><div class="text-2xl font-bold text-emerald-700">${d.win_pct}%</div><div class="text-xs text-slate-500">Win %</div></div></div>
+<h2 class="font-semibold mb-3">Match History</h2>
+<div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Date</th><th class="p-3">Match</th><th class="p-3">Line</th><th class="p-3">Result</th></tr></thead><tbody>${
+  d.history.map(h=>`<tr class="border-t"><td class="p-3">${h.match_date}</td><td class="p-3"><a href="/match.html?id=${h.match_id}" class="text-emerald-700">${esc(h.home)} vs ${esc(h.away)}</a></td>
+  <td class="p-3">${esc(h.line_name)}</td><td class="p-3">${h.result?(h.won?'<span class="text-green-700 font-medium">W</span>':'<span class="text-red-600 font-medium">L</span>'):'—'}</td></tr>`).join("") || `<tr><td colspan="4" class="p-6 text-center text-slate-400">No history</td></tr>`
+}</tbody></table></div>`, "Players");
+</script></body></html>

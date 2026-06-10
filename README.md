@@ -1,10 +1,14 @@
 # WACTA Tennis Scores
 
-Lightweight tennis group scoring app on **Cloudflare Pages + D1**.
+Full private tennis league management on **Cloudflare Pages + D1**.
 
-- Public leaderboard & match history (no login)
-- Optional password for submitting scores/players
-- Mobile-friendly UI
+- **Leagues & teams** with configurable line templates
+- **Players** with NTRP ratings, assigned to teams
+- **Match scheduling** with calendar view
+- **Lineups & scores** per line with tennis validation
+- **Standings** — match W/L, line W/L, game win %
+- **Player search & history**
+- **Auth** — admin + captain logins (default: `admin` / `admin`)
 
 ## Stack
 

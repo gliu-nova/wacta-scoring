@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc } from "/js/ui.js";
+if ((await getUser())?.role !== "admin") location.href="/login.html";
+const [users, teams] = await Promise.all([api("/admin/users"), api("/admin/teams")]);
+const tmap = Object.fromEntries(teams.map(t => [t.id, t.name]));
+page("Users", `<h1 class="text-2xl font-bold mb-4">Users</h1>
+<div class="bg-white rounded-xl border mb-6"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">User</th><th class="p-3">Role</th><th class="p-3">Team</th></tr></thead><tbody>${
+  users.map(u => `<tr class="border-t"><td class="p-3">${esc(u.username)}</td><td class="p-3 capitalize">${u.role}</td><td class="p-3">${esc(tmap[u.team_id]||"—")}</td></tr>`).join("")
+}</tbody></table></div>
+<form id="form" class="flex flex-wrap gap-2 bg-white p-4 rounded-xl border items-end">
+<input name="username" required placeholder="Username" class="border rounded px-2 py-1">
+<input name="password" type="password" required placeholder="Password" class="border rounded px-2 py-1">
+<select name="role" class="border rounded px-2 py-1"><option value="captain">Captain</option><option value="player">Player</option><option value="admin">Admin</option></select>
+<select name="team_id" class="border rounded px-2 py-1"><option value="">—</option>${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
+document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
+  await api("/admin/users",{method:"POST",body:JSON.stringify({username:fd.get("username"),password:fd.get("password"),role:fd.get("role"),team_id:fd.get("team_id")?Number(fd.get("team_id")):null})});
+  location.reload(); };
+</script></body></html>

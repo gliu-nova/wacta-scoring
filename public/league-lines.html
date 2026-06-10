@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc } from "/js/ui.js";
+if ((await getUser())?.role !== "admin") location.href="/login.html";
+const id = new URLSearchParams(location.search).get("id");
+page("Line Templates", `<a href="/leagues.html" class="text-emerald-600 text-sm">← Leagues</a>
+<h1 class="text-2xl font-bold my-4">Line Templates</h1>
+<div id="list" class="bg-white rounded-xl border mb-4"></div>
+<form id="form" class="flex gap-2 flex-wrap"><input name="name" required placeholder="Open Mens" class="border rounded-lg px-3 py-2">
+<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="doubles" checked> Doubles</label>
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
+async function load() {
+  const lines = await api("/admin/leagues/"+id+"/lines");
+  document.getElementById("list").innerHTML = lines.map(l =>
+    `<div class="flex justify-between p-3 border-b"><span>${esc(l.name)} ${l.is_doubles?"":"(Singles)"}</span>
+    <button data-del="${l.id}" class="text-red-600 text-sm">Delete</button></div>`).join("") || "<p class='p-4 text-slate-400'>No lines yet</p>";
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await api(`/admin/leagues/${id}/lines/${b.dataset.del}`,{method:"DELETE"}); load(); });
+}
+document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
+  await api("/admin/leagues/"+id+"/lines",{method:"POST",body:JSON.stringify({name:fd.get("name"),is_doubles:!!fd.get("doubles")})}); e.target.reset(); load(); };
+load();
+</script></body></html>

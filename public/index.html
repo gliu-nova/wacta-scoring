@@ -1,35 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WACTA Tennis Scores</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
-  <header>
-    <h1>🎾 WACTA Scores</h1>
-    <p>Group leaderboard &amp; match history</p>
-    <nav>
-      <a href="/" class="active">Home</a>
-      <a href="/submit.html">Submit Score</a>
-      <a href="/players.html">Players</a>
-    </nav>
-  </header>
-  <main>
-    <div class="card">
-      <h2>Leaderboard</h2>
-      <div id="leaderboard"><div class="loading">Loading…</div></div>
-    </div>
-    <div class="card">
-      <h2>Recent Matches</h2>
-      <div id="matches"><div class="loading">Loading…</div></div>
-    </div>
-  </main>
-  <script type="module">
-    import { loadLeaderboard, loadMatches } from "/js/app.js";
-    loadLeaderboard(document.getElementById("leaderboard"));
-    loadMatches(document.getElementById("matches"));
-  </script>
-</body>
-</html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<title>WACTA Scoring</title>
+</head><body class="bg-slate-50 min-h-screen">
+<div id="app"></div>
+<script type="module">
+import { api, page, esc } from "/js/ui.js";
+page("WACTA Scoring", `
+  <h1 class="text-2xl font-bold mb-2">Private Tennis League Scoring</h1>
+  <p class="text-slate-600 mb-8">Schedules, lineups, scores, and standings.</p>
+  <div class="grid sm:grid-cols-3 gap-4 mb-8" id="cards"></div>
+  <h2 class="font-semibold mb-3">Leagues</h2>
+  <div id="leagues" class="flex flex-wrap gap-2"></div>`, "Home");
+const leagues = await api("/admin/leagues");
+document.getElementById("leagues").innerHTML = leagues.map(l =>
+  `<a href="/standings.html?league=${l.id}" class="px-4 py-2 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-200 hover:bg-emerald-100">${esc(l.name)}</a>`).join("");
+document.getElementById("cards").innerHTML = [
+  ["/calendar.html","Match Calendar","View scheduled matches"],
+  ["/standings.html","Standings","Live rankings by league"],
+  ["/players.html","Player Search","History and stats"],
+].map(([h,t,d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400"><h2 class="font-semibold text-emerald-700">${t}</h2><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
+</script></body></html>

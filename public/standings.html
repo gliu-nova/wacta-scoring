@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, page, esc } from "/js/ui.js";
+const leagues = await api("/admin/leagues");
+let leagueId = new URLSearchParams(location.search).get("league") || leagues[0]?.id;
+page("Standings", `<div class="flex flex-wrap justify-between gap-3 mb-4"><h1 class="text-2xl font-bold">Standings</h1>
+<select id="lg" class="border rounded-lg px-3 py-2">${leagues.map(l=>`<option value="${l.id}" ${l.id==leagueId?"selected":""}>${esc(l.name)}</option>`).join("")}</select></div>
+<div id="table" class="bg-white rounded-xl border overflow-x-auto"></div>`, "Standings");
+async function load() {
+  const s = await api("/standings/"+leagueId);
+  document.getElementById("table").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr>
+    <th class="p-3">#</th><th class="p-3 text-left">Team</th><th class="p-3">W-L</th><th class="p-3">Match%</th><th class="p-3">Lines</th><th class="p-3">Game%</th></tr></thead><tbody>${
+    s.map((t,i)=>`<tr class="border-t"><td class="p-3 text-slate-400">${i+1}</td><td class="p-3 font-medium">${esc(t.team_name)}</td>
+    <td class="p-3 text-center"><span class="text-green-700">${t.match_wins}</span>-<span class="text-red-600">${t.match_losses}</span></td>
+    <td class="p-3 text-center">${t.match_win_pct}%</td>
+    <td class="p-3 text-center"><span class="text-green-700">${t.line_wins}</span>-<span class="text-red-600">${t.line_losses}</span></td>
+    <td class="p-3 text-center font-medium">${t.game_win_pct}%</td></tr>`).join("") || `<tr><td colspan="6" class="p-8 text-center text-slate-400">No completed matches yet</td></tr>`
+  }</tbody></table>`;
+}
+document.getElementById("lg").onchange = (e) => { leagueId=e.target.value; load(); };
+load();
+</script></body></html>

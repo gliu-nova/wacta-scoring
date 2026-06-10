@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc, alert } from "/js/ui.js";
+if ((await getUser())?.role !== "admin") location.href="/login.html";
+page("Leagues", `<div class="flex justify-between mb-6"><h1 class="text-2xl font-bold">Leagues</h1><button id="add" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">+ New</button></div>
+<div id="msg" hidden></div><div id="list" class="bg-white rounded-xl border overflow-hidden"></div>
+<div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4"><div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h2 class="font-bold mb-4" id="mtitle">New League</h2>
+  <input id="name" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Name">
+  <textarea id="desc" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Description" rows="2"></textarea>
+  <button id="save" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Save</button>
+</div></div>`, "Admin");
+let editId = null;
+async function load() {
+  const leagues = await api("/admin/leagues");
+  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Name</th><th class="p-3">Actions</th></tr></thead><tbody>${
+    leagues.map(l => `<tr class="border-t"><td class="p-3 font-medium">${esc(l.name)}<br><span class="text-slate-400 text-xs">${esc(l.description||"")}</span></td>
+    <td class="p-3"><a href="/league-lines.html?id=${l.id}" class="text-emerald-600 mr-2">Lines</a>
+    <button data-edit="${l.id}" data-name="${esc(l.name)}" class="text-blue-600 mr-2">Edit</button>
+    <button data-del="${l.id}" class="text-red-600">Delete</button></td></tr>`).join("")}</tbody></table>`;
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if(confirm("Delete?")) { await api("/admin/leagues/"+b.dataset.del,{method:"DELETE"}); load(); }});
+  document.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { editId=b.dataset.edit; document.getElementById("name").value=b.dataset.name; document.getElementById("modal").classList.remove("hidden"); });
+}
+document.getElementById("add").onclick = () => { editId=null; document.getElementById("name").value=""; document.getElementById("desc").value=""; document.getElementById("modal").classList.remove("hidden"); };
+document.getElementById("save").onclick = async () => {
+  const body = { name: document.getElementById("name").value, description: document.getElementById("desc").value };
+  try { editId ? await api("/admin/leagues/"+editId,{method:"PUT",body:JSON.stringify(body)}) : await api("/admin/leagues",{method:"POST",body:JSON.stringify(body)});
+    document.getElementById("modal").classList.add("hidden"); load(); } catch(e) { alert(document.getElementById("msg"), e.message); }
+};
+load();
+</script></body></html>

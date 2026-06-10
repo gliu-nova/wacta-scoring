@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, page, esc } from "/js/ui.js";
+const id = new URLSearchParams(location.search).get("id");
+const data = await api("/matches/"+id);
+const m = data.match;
+page("Match", `<a href="/calendar.html" class="text-emerald-600 text-sm">← Calendar</a>
+<h1 class="text-2xl font-bold mt-2">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
+<p class="text-slate-500 mb-4">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span></p>
+<div class="flex gap-3 mb-6" id="actions"></div>
+<div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr>
+<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Calendar");
+const players = await api("/admin/players");
+const pmap = Object.fromEntries(players.map(p => [p.id, p.first_name+" "+p.last_name]));
+if (data.can_edit) {
+  document.getElementById("actions").innerHTML = `<a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Lineup</a>
+    ${data.can_score?`<a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg">Enter Scores</a>`:`<span class="px-4 py-2 bg-slate-200 text-slate-500 rounded-lg text-sm">Scores available on match date</span>`}`;
+}
+document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,result}) => {
+  const hp = lineup ? [lineup.home_player1_id,lineup.home_player2_id].filter(Boolean).map(i=>pmap[i]).join(", ") : "—";
+  const ap = lineup ? [lineup.away_player1_id,lineup.away_player2_id].filter(Boolean).map(i=>pmap[i]).join(", ") : "—";
+  const sc = result ? `${result.home_set1}-${result.away_set1}, ${result.home_set2}-${result.away_set2}${result.home_set3!=null?`, ${result.home_set3}-${result.away_set3}`:""}` : "—";
+  const res = result ? (result.winner==="home"?`<span class="text-green-700 font-medium">${esc(m.home_name)} W</span>`:`<span class="text-green-700 font-medium">${esc(m.away_name)} W</span>`) : "<span class='text-slate-400'>Pending</span>";
+  return `<tr class="border-t"><td class="p-3 font-medium">${esc(line.name)}</td><td class="p-3">${esc(hp)}</td><td class="p-3">${esc(ap)}</td><td class="p-3 font-mono">${sc}</td><td class="p-3">${res}</td></tr>`;
+}).join("");
+</script></body></html>

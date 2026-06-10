@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, page, esc, alert } from "/js/ui.js";
+const id = new URLSearchParams(location.search).get("id");
+const data = await api("/matches/"+id);
+const m = data.match;
+const [homeP, awayP] = await Promise.all([
+  api("/admin/players").then(ps => ps.filter(p => p.team_id === m.home_team_id)),
+  api("/admin/players").then(ps => ps.filter(p => p.team_id === m.away_team_id)),
+]);
+const opts = (ps, sel) => `<option value="">—</option>${ps.map(p=>`<option value="${p.id}" ${sel===p.id?"selected":""}>${esc(p.first_name)} ${esc(p.last_name)} (${p.ntrp_rating})</option>`).join("")}`;
+page("Lineup", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
+<h1 class="text-2xl font-bold my-4">Lineup</h1><div id="msg" hidden></div><form id="form" class="space-y-4"></form>
+<button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg">Save Lineup</button>`, "Calendar");
+document.getElementById("form").innerHTML = data.lineData.map(({line,lineup}) => `
+  <div class="bg-white p-4 rounded-xl border"><h3 class="font-semibold mb-3">${esc(line.name)}</h3>
+  <div class="grid sm:grid-cols-2 gap-4">
+    <div><label class="text-sm text-slate-500">${esc(m.home_name)}</label>
+      <select name="h1_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(homeP,lineup?.home_player1_id)}</select>
+      ${line.is_doubles?`<select name="h2_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(homeP,lineup?.home_player2_id)}</select>`:""}
+    </div><div><label class="text-sm text-slate-500">${esc(m.away_name)}</label>
+      <select name="a1_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(awayP,lineup?.away_player1_id)}</select>
+      ${line.is_doubles?`<select name="a2_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(awayP,lineup?.away_player2_id)}</select>`:""}
+    </div></div></div>`).join("");
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault(); const fd = new FormData(e.target);
+  const lineups = data.lineData.map(({line}) => ({
+    match_line_id: line.id,
+    home_player1_id: Number(fd.get("h1_"+line.id))||undefined,
+    home_player2_id: line.is_doubles ? Number(fd.get("h2_"+line.id))||undefined : undefined,
+    away_player1_id: Number(fd.get("a1_"+line.id))||undefined,
+    away_player2_id: line.is_doubles ? Number(fd.get("a2_"+line.id))||undefined : undefined,
+  }));
+  try {
+    const r = await api("/matches/"+id+"/lineup",{method:"PUT",body:JSON.stringify({lineups})});
+    if(r.warnings?.length) alert(document.getElementById("msg"), r.warnings.join(" "), "success");
+    else location.href="/match.html?id="+id;
+  } catch(err) { alert(document.getElementById("msg"), err.message); }
+};
+</script></body></html>
