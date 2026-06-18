@@ -17,7 +17,7 @@ page("WACTA Scoring", `
     <h2 class="text-xl font-bold">Enter Match Results</h2>
     <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores — publishes immediately" : "Submit scores for admin review before publishing"}</p>
   </a>
-  <div class="grid sm:grid-cols-3 gap-4 mb-10" id="cards"></div>
+  <div class="grid sm:grid-cols-2 gap-4 mb-10" id="cards"></div>
   <h2 class="text-xl font-bold mb-4">Standings</h2>
   <div id="standings" class="space-y-6 mb-10"></div>
   <h2 class="text-xl font-bold mb-4">Recent Changes</h2>
@@ -25,7 +25,6 @@ page("WACTA Scoring", `
 
 document.getElementById("cards").innerHTML = [
   ["/standings.html", "Standings", "Full standings with export"],
-  ["/players.html", "Player Search", "History and stats"],
   ["/past-results.html", "Past Match Results", "Browse all previous matches and scores"],
 ].map(([h, t, d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400">
   <h3 class="font-semibold text-emerald-700">${t}</h3><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
