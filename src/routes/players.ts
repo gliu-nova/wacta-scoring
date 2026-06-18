@@ -31,12 +31,13 @@ players.get("/:id", async (c) => {
     const home = await c.env.DB.prepare("SELECT name FROM teams WHERE id = ?").bind(row.home_team_id).first<{ name: string }>();
     const away = await c.env.DB.prepare("SELECT name FROM teams WHERE id = ?").bind(row.away_team_id).first<{ name: string }>();
     const side = [row.home_player1_id, row.home_player2_id].includes(id) ? "home" : "away";
-    const won = result && (result as { winner: string }).winner === side;
-    history.push({ match_id: row.match_id, match_date: row.match_date, line_name: row.line_name, home: home?.name, away: away?.name, won, result });
+    const w = result ? (result as { winner: string }).winner : null;
+    const won = w === side;
+    history.push({ match_id: row.match_id, match_date: row.match_date, line_name: row.line_name, home: home?.name, away: away?.name, won, tied: w === "tie", result });
   }
   history.sort((a, b) => b.match_date.localeCompare(a.match_date));
   const line_wins = history.filter((h) => h.won).length;
-  const line_losses = history.filter((h) => h.result && !h.won).length;
+  const line_losses = history.filter((h) => h.result && !h.won && !h.tied).length;
   return c.json({
     player, team, history,
     line_wins, line_losses,

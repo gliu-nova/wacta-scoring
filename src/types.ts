@@ -10,6 +10,7 @@ export type Env = {
 export type UserRole = "admin" | "captain" | "player";
 export type MatchStatus = "scheduled" | "lineup_set" | "in_progress" | "completed";
 export type Side = "home" | "away";
+export type LineWinner = Side | "tie";
 
 export type User = {
   id: number;
@@ -50,7 +51,7 @@ export type LineResult = {
   home_set1: number; away_set1: number; home_tb1: number | null; away_tb1: number | null;
   home_set2: number; away_set2: number; home_tb2: number | null; away_tb2: number | null;
   home_set3: number | null; away_set3: number | null; home_tb3: number | null; away_tb3: number | null;
-  winner: Side; submitted_by_id: number | null; submitted_at: string;
+  winner: LineWinner; submitted_by_id: number | null; submitted_at: string;
 };
 
 export type TeamStanding = {

@@ -16,15 +16,19 @@ export function renderLineCards(lineData, homeName, awayName) {
     return `<div class="bg-white p-4 rounded-xl border">
       <h3 class="font-semibold mb-3">${esc(line.name)}</h3>
       <div class="mb-4">
-        <label class="text-sm font-medium text-slate-700">Winner <span class="text-red-600">*</span></label>
+        <label class="text-sm font-medium text-slate-700">Result <span class="text-red-600">*</span></label>
         <div class="flex flex-wrap gap-4 mt-2">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="radio" name="winner_${line.id}" value="home" ${win === "home" ? "checked" : ""} required>
-            <span>${esc(homeName)}</span>
+            <span>${esc(homeName)} wins</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="radio" name="winner_${line.id}" value="away" ${win === "away" ? "checked" : ""} required>
-            <span>${esc(awayName)}</span>
+            <span>${esc(awayName)} wins</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="winner_${line.id}" value="tie" ${win === "tie" ? "checked" : ""} required>
+            <span>Tie</span>
           </label>
         </div>
       </div>

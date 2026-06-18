@@ -20,7 +20,7 @@ export function esc(s) {
 
 export function nav(user, active = "") {
   const links = [
-    ["Home", "/"], ["Enter Results", "/enter.html"], ["Standings", "/standings.html"], ["Players", "/players.html"],
+    ["Home", "/"], ["Enter Match Results", "/enter.html"], ["Standings", "/standings.html"], ["Players", "/players.html"],
   ];
   if (user) links.splice(3, 0, ["Calendar", "/calendar.html"]);
   if (user?.role === "admin") links.push(["Admin", "/admin.html"]);

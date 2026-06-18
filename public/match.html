@@ -7,13 +7,13 @@ const id = new URLSearchParams(location.search).get("id");
 const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
 const m = data.match;
 const loginUrl = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
-page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter Results</a>
+page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter Match Results</a>
 <h1 class="text-2xl font-bold mt-2">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
 <p class="text-slate-500 mb-4">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span>${m.location ? ` · ${esc(m.location)}` : ""}</p>
 <div id="notice" class="mb-4"></div>
 <div class="flex flex-wrap gap-3 mb-6" id="actions"></div>
 <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr>
-<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Enter Results");
+<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Enter Match Results");
 const players = await api("/admin/players");
 const pmap = Object.fromEntries(players.map(p => [p.id, p.first_name+" "+p.last_name]));
 if (!user) {
@@ -30,7 +30,10 @@ document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,resu
   const ap = lineup?.away_players_text || (lineup ? [lineup.away_player1_id,lineup.away_player2_id].filter(Boolean).map(i=>pmap[i]).join(", ") : "") || "—";
   const hasSc = result && (result.home_set1||result.away_set1||result.home_set2||result.away_set2||result.home_set3||result.away_set3);
   const sc = !result ? "—" : hasSc ? `${result.home_set1}-${result.away_set1}, ${result.home_set2}-${result.away_set2}${result.home_set3!=null?`, ${result.home_set3}-${result.away_set3}`:""}` : "—";
-  const res = result ? (result.winner==="home"?`<span class="text-green-700 font-medium">${esc(m.home_name)} W</span>`:`<span class="text-green-700 font-medium">${esc(m.away_name)} W</span>`) : "<span class='text-slate-400'>Pending</span>";
+  const res = !result ? "<span class='text-slate-400'>Pending</span>"
+    : result.winner==="tie" ? "<span class='text-slate-600 font-medium'>Tie</span>"
+    : result.winner==="home" ? `<span class="text-green-700 font-medium">${esc(m.home_name)} W</span>`
+    : `<span class="text-green-700 font-medium">${esc(m.away_name)} W</span>`;
   return `<tr class="border-t"><td class="p-3 font-medium">${esc(line.name)}</td><td class="p-3">${esc(hp)}</td><td class="p-3">${esc(ap)}</td><td class="p-3 font-mono">${sc}</td><td class="p-3">${res}</td></tr>`;
 }).join("");
 </script></body></html>

@@ -1,4 +1,4 @@
-import type { Player, Side } from "../types";
+import type { LineWinner, Player, Side } from "../types";
 
 export function setWinner(h: number, a: number, htb: number | null, atb: number | null): Side | null {
   if (h === 6 && a === 6) {
@@ -52,9 +52,9 @@ export function hasLineScores(s: {
 
 export function validateLineScoreEntry(
   s: Parameters<typeof validateLineScore>[0],
-  winner?: Side | null,
+  winner?: LineWinner | null,
 ): { ok: boolean; errors: string[] } {
-  if (winner !== "home" && winner !== "away") return { ok: false, errors: ["Winner required"] };
+  if (winner !== "home" && winner !== "away" && winner !== "tie") return { ok: false, errors: ["Result required (home, away, or tie)"] };
   for (const n of [s.home_set1, s.away_set1, s.home_set2, s.away_set2, s.home_set3, s.away_set3]) {
     if (n != null && n < 0) return { ok: false, errors: ["Scores cannot be negative"] };
   }

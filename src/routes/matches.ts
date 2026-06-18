@@ -3,7 +3,7 @@ import { getUser } from "../auth";
 import { createMatchLines, updateMatchStatus } from "../services/matches";
 import { computeStandings } from "../services/standings";
 import { ratingWarnings, validateLineScoreEntry } from "../services/validation";
-import type { Env, Lineup, LineResult, Match, MatchLine, Player, Side, User } from "../types";
+import type { Env, Lineup, LineResult, LineWinner, Match, MatchLine, Player, User } from "../types";
 
 const matches = new Hono<{ Bindings: Env }>();
 
@@ -91,7 +91,7 @@ matches.put("/:id/scores", async (c) => {
   if (!match) return c.json({ error: "Not found" }, 404);
   const { scores } = await c.req.json<{ scores: Array<{
     match_line_id: number;
-    winner: Side;
+    winner: LineWinner;
     home_set1?: number; away_set1?: number; home_tb1?: number; away_tb1?: number;
     home_set2?: number; away_set2?: number; home_tb2?: number; away_tb2?: number;
     home_set3?: number; away_set3?: number; home_tb3?: number; away_tb3?: number;

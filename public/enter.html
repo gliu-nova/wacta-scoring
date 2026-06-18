@@ -9,16 +9,16 @@ const user = await getUser();
 const loginUrl = `/login.html?next=${encodeURIComponent("/enter.html")}`;
 
 if (!user) {
-  page("Enter Results", `<div class="max-w-lg mx-auto mt-12 bg-white p-8 rounded-xl border text-center">
+  page("Enter Match Results", `<div class="max-w-lg mx-auto mt-12 bg-white p-8 rounded-xl border text-center">
     <h1 class="text-2xl font-bold mb-4">Enter Match Results</h1>
     <p class="text-slate-600 mb-6">Log in to record match scores.</p>
     <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
-  </div>`, "Enter Results");
+  </div>`, "Enter Match Results");
 } else {
   const [leagues, teams] = await Promise.all([api("/admin/leagues"), api("/admin/teams")]);
   const today = new Date().toISOString().slice(0, 10);
 
-  page("Enter Results", `
+  page("Enter Match Results", `
     <h1 class="text-2xl font-bold mb-2">Enter Match Results</h1>
     <p class="text-slate-500 mb-6">Pick the teams and enter scores — no need to schedule ahead on the calendar.</p>
     <div id="msg" hidden></div>
@@ -34,10 +34,10 @@ if (!user) {
         <div><label class="text-sm text-slate-500">Away team</label>
           <select id="away" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
       </div>
-      <p class="text-sm text-slate-500 mt-4">Next step: pick the winner for each line (scores and player names optional).</p>
+      <p class="text-sm text-slate-500 mt-4">Next step: pick the result for each line — win or tie (scores and player names optional).</p>
       <button id="start" class="mt-2 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Continue to Scores</button>
     </div>
-    <div id="scores" class="hidden"></div>`, "Enter Results");
+    <div id="scores" class="hidden"></div>`, "Enter Match Results");
 
   const leagueEl = document.getElementById("league");
   const homeEl = document.getElementById("home");

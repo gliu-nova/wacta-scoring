@@ -35,7 +35,7 @@ export async function computeStandings(db: D1Database, leagueId: number): Promis
       map.get(match.home_team_id)!.games_won += hw; map.get(match.home_team_id)!.games_lost += hl;
       map.get(match.away_team_id)!.games_won += aw; map.get(match.away_team_id)!.games_lost += al;
       if (r.winner === "home") { homeLines++; map.get(match.home_team_id)!.line_wins++; map.get(match.away_team_id)!.line_losses++; }
-      else { awayLines++; map.get(match.away_team_id)!.line_wins++; map.get(match.home_team_id)!.line_losses++; }
+      else if (r.winner === "away") { awayLines++; map.get(match.away_team_id)!.line_wins++; map.get(match.home_team_id)!.line_losses++; }
     }
     map.get(match.home_team_id)!.matches_played++;
     map.get(match.away_team_id)!.matches_played++;

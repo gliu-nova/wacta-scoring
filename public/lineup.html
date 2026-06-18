@@ -12,7 +12,7 @@ if (!user) {
   <div class="mt-8 bg-amber-50 border border-amber-200 p-6 rounded-xl text-center">
     <p class="mb-4">Log in to set lineups.</p>
     <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
-  </div>`, "Enter Results");
+  </div>`, "Enter Match Results");
 } else {
 const [homeP, awayP] = await Promise.all([
   api("/admin/players").then(ps => ps.filter(p => p.team_id === m.home_team_id)),
@@ -21,7 +21,7 @@ const [homeP, awayP] = await Promise.all([
 const opts = (ps, sel) => `<option value="">—</option>${ps.map(p=>`<option value="${p.id}" ${sel===p.id?"selected":""}>${esc(p.first_name)} ${esc(p.last_name)} (${p.ntrp_rating})</option>`).join("")}`;
 page("Lineup", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
 <h1 class="text-2xl font-bold my-4">Lineup</h1><div id="msg" hidden></div><form id="form" class="space-y-4"></form>
-<button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg">Save Lineup</button>`, "Enter Results");
+<button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg">Save Lineup</button>`, "Enter Match Results");
 document.getElementById("form").innerHTML = data.lineData.map(({line,lineup}) => `
   <div class="bg-white p-4 rounded-xl border"><h3 class="font-semibold mb-3">${esc(line.name)}</h3>
   <div class="grid sm:grid-cols-2 gap-4">
