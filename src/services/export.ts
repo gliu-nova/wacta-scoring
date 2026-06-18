@@ -67,13 +67,32 @@ export async function playersCsv(db: D1Database, leagueId?: number): Promise<str
   ].join("\n");
 }
 
+function sidePlayers(lineup: {
+  home_player1_id: number | null; home_player2_id: number | null;
+  away_player1_id: number | null; away_player2_id: number | null;
+  home_players_text?: string | null; away_players_text?: string | null;
+} | null, side: "home" | "away", pmap: Map<number, Player>): string {
+  if (!lineup) return "";
+  const text = side === "home" ? lineup.home_players_text : lineup.away_players_text;
+  if (text?.trim()) return text.trim();
+  const ids = side === "home"
+    ? [lineup.home_player1_id, lineup.home_player2_id]
+    : [lineup.away_player1_id, lineup.away_player2_id];
+  return lineupNames(ids, pmap);
+}
+
 export async function matchesCsv(db: D1Database, leagueId?: number): Promise<string> {
   let sql = `SELECT m.*, l.name league_name, ht.name home_name, at.name away_name
     FROM matches m JOIN leagues l ON l.id = m.league_id
-    JOIN teams ht ON ht.id = m.home_team_id JOIN teams at ON at.id = m.away_team_id`;
+    JOIN teams ht ON ht.id = m.home_team_id JOIN teams at ON at.id = m.away_team_id
+    WHERE EXISTS (
+      SELECT 1 FROM match_lines ml
+      JOIN line_results lr ON lr.match_line_id = ml.id
+      WHERE ml.match_id = m.id
+    )`;
   const binds: number[] = [];
-  if (leagueId) { sql += " WHERE m.league_id = ?"; binds.push(leagueId); }
-  sql += " ORDER BY m.match_date, m.id";
+  if (leagueId) { sql += " AND m.league_id = ?"; binds.push(leagueId); }
+  sql += " ORDER BY m.match_date DESC, m.id DESC";
   const matches = await db.prepare(sql).bind(...binds).all();
   const players = await db.prepare("SELECT * FROM players").all<Player>();
   const pmap = new Map((players.results ?? []).map((p) => [p.id, p]));
@@ -92,15 +111,17 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
       const lineup = await db.prepare("SELECT * FROM lineups WHERE match_line_id = ?").bind(l.id).first<{
         home_player1_id: number | null; home_player2_id: number | null;
         away_player1_id: number | null; away_player2_id: number | null;
+        home_players_text: string | null; away_players_text: string | null;
       }>();
       const result = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(l.id).first();
+      if (!result) continue;
       rows.push(csvRow([
         match.league_name, match.match_date, match.home_name, match.away_name, match.status, match.location,
         l.name,
-        lineup ? lineupNames([lineup.home_player1_id, lineup.home_player2_id], pmap) : "",
-        lineup ? lineupNames([lineup.away_player1_id, lineup.away_player2_id], pmap) : "",
-        result ? formatScore(result as never) : "",
-        result ? (result as { winner: string }).winner : "",
+        sidePlayers(lineup, "home", pmap),
+        sidePlayers(lineup, "away", pmap),
+        formatScore(result as never),
+        (result as { winner: string }).winner,
       ]));
     }
   }

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc, downloadCsv } from "/js/ui.js";
+
+const user = await getUser();
+const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
+const base = location.origin + "/api/export";
+
+page("Export Data", `<h1 class="text-2xl font-bold mb-2">Export Data</h1>
+<p class="text-slate-500 mb-8">Download CSV files or set up manual Google Sheets sync (updates only when you click refresh).</p>
+
+<h2 class="text-lg font-semibold mb-3">Download CSV</h2>
+<div class="bg-white rounded-xl border p-5 mb-8 space-y-4">
+  <div class="flex flex-wrap gap-3">
+    <button id="dl-standings" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">Standings (all divisions)</button>
+    <button id="dl-matches" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm">Match Results (all)</button>
+    ${user?.role === "admin" ? `<button id="dl-all" class="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm">Everything</button>` : ""}
+  </div>
+  <div>
+    <p class="text-sm text-slate-500 mb-2">Per division:</p>
+    <div class="flex flex-wrap gap-2" id="league-btns"></div>
+  </div>
+</div>
+
+<h2 class="text-lg font-semibold mb-3">Google Sheets (manual refresh)</h2>
+<div class="bg-white rounded-xl border p-5 mb-4 text-sm text-slate-700 space-y-4">
+  <p>Your spreadsheet <strong>won't auto-update</strong> — it only refreshes when you click a button in Google Sheets. If the website goes down, your sheet keeps its last snapshot.</p>
+  <ol class="list-decimal list-inside space-y-2 text-slate-600">
+    <li>Open your Google Sheet → <strong>Extensions → Apps Script</strong></li>
+    <li>Paste the script below and save</li>
+    <li>Run <code class="bg-slate-100 px-1 rounded">refreshWactaData</code> once to authorize, then add a drawing/button assigned to that function</li>
+    <li>Click the button whenever you want the latest data from the website</li>
+  </ol>
+  <p class="text-xs text-slate-500">Creates/updates tabs: one per division standings + one "Match Results" tab.</p>
+  <textarea id="script" readonly rows="16" class="w-full font-mono text-xs border rounded-lg p-3 bg-slate-50"></textarea>
+  <button id="copy-script" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Copy Script</button>
+</div>
+
+<h2 class="text-lg font-semibold mb-3">Public CSV URLs</h2>
+<div class="bg-white rounded-xl border p-5 text-sm space-y-2" id="urls"></div>`, user?.role === "admin" ? "Admin" : "Standings");
+
+document.getElementById("dl-standings").onclick = () => leagues.forEach((lg) => downloadCsv(`/export/standings.csv?league_id=${lg.id}`));
+document.getElementById("dl-matches").onclick = () => downloadCsv("/export/matches.csv");
+document.getElementById("dl-all")?.onclick = () => downloadCsv("/export/all.csv");
+
+document.getElementById("league-btns").innerHTML = leagues.map((lg) =>
+  `<button data-lg="${lg.id}" class="px-3 py-1.5 border rounded-lg text-sm hover:bg-slate-50">${esc(lg.name)}</button>`).join("");
+document.getElementById("league-btns").onclick = (e) => {
+  const btn = e.target.closest("[data-lg]");
+  if (!btn) return;
+  downloadCsv(`/export/standings.csv?league_id=${btn.dataset.lg}`);
+  downloadCsv(`/export/matches.csv?league_id=${btn.dataset.lg}`);
+};
+
+const script = `const BASE = "${base}";
+const LEAGUES = [${leagues.map((l) => `{ id: ${l.id}, name: ${JSON.stringify(l.name)} }`).join(", ")}];
+
+function refreshWactaData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  LEAGUES.forEach((lg) => {
+    const csv = UrlFetchApp.fetch(BASE + "/standings.csv?league_id=" + lg.id).getContentText();
+    const sheet = getOrCreateSheet(ss, "Standings " + lg.name);
+    writeCsv(sheet, csv);
+  });
+  const matches = UrlFetchApp.fetch(BASE + "/matches.csv").getContentText();
+  writeCsv(getOrCreateSheet(ss, "Match Results"), matches);
+  SpreadsheetApp.getUi().alert("WACTA data refreshed!");
+}
+
+function getOrCreateSheet(ss, name) {
+  return ss.getSheetByName(name) || ss.insertSheet(name);
+}
+
+function writeCsv(sheet, csv) {
+  sheet.clear();
+  const rows = Utilities.parseCsv(csv);
+  if (rows.length) sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+}`;
+document.getElementById("script").value = script;
+document.getElementById("copy-script").onclick = () => {
+  navigator.clipboard.writeText(script);
+  document.getElementById("copy-script").textContent = "Copied!";
+  setTimeout(() => { document.getElementById("copy-script").textContent = "Copy Script"; }, 2000);
+};
+
+document.getElementById("urls").innerHTML = [
+  ["Standings (per division)", `${base}/standings.csv?league_id=LEAGUE_ID`],
+  ["Match results (all submitted)", `${base}/matches.csv`],
+  ["Match results (one division)", `${base}/matches.csv?league_id=LEAGUE_ID`],
+].map(([label, url]) => `<div><span class="text-slate-500">${esc(label)}:</span><br><code class="text-xs break-all">${esc(url)}</code></div>`).join("");
+</script></body></html>
