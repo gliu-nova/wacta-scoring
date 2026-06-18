@@ -51,9 +51,10 @@ function fmtWhen(iso) {
 document.getElementById("activity").innerHTML = activity.length
   ? activity.map((a) => {
       const inner = `<div class="flex flex-wrap justify-between gap-2">
-        <span>${esc(a.description)}</span>
+        <span class="font-medium">${esc(a.description)}</span>
         <span class="text-sm text-slate-400 whitespace-nowrap">${fmtWhen(a.created_at)}</span>
       </div>
+      ${a.details?.subtitle ? `<div class="text-sm text-amber-700 mt-1">${esc(a.details.subtitle)}</div>` : ""}
       ${a.username ? `<div class="text-xs text-slate-400 mt-1">by ${esc(a.username)}</div>` : ""}`;
       return a.link
         ? `<a href="${esc(a.link)}" class="block p-4 border-b last:border-b-0 hover:bg-slate-50">${inner}</a>`

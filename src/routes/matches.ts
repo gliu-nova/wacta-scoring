@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getUser } from "../auth";
-import { logActivity } from "../services/activity";
+import { logActivity, logActivityLinked } from "../services/activity";
+import { buildLineupChangeDetails, buildMatchChangeDetails, buildScoreChangeDetails } from "../services/changes";
 import { createMatchLines, updateMatchStatus } from "../services/matches";
 import {
   approvePendingSubmission,
@@ -144,6 +145,7 @@ matches.put("/:id", async (c) => {
       if (!team) return c.json({ error: "Teams must belong to this match's league" }, 400);
     }
   }
+  const details = await buildMatchChangeDetails(c.env.DB, match, b);
   await c.env.DB.prepare(
     "UPDATE matches SET match_date = ?, location = ?, home_team_id = ?, away_team_id = ? WHERE id = ?"
   ).bind(
@@ -155,7 +157,9 @@ matches.put("/:id", async (c) => {
     `SELECT ht.name as home_name, at.name as away_name FROM matches m
      JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
   ).bind(matchId).first<{ home_name: string; away_name: string }>();
-  if (info) await logActivity(c.env.DB, user, `Updated match ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
+  if (info && details) {
+    await logActivityLinked(c.env.DB, user, `Updated match ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`, details);
+  }
   return c.json({ ok: true });
 });
 
@@ -174,7 +178,10 @@ matches.post("/", async (c) => {
      FROM matches m JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id
      JOIN leagues l ON l.id=m.league_id WHERE m.id = ?`
   ).bind(match?.id).first<{ home_name: string; away_name: string; league_name: string }>();
-  if (info) await logActivity(c.env.DB, user, `Created match ${info.home_name} vs ${info.away_name} (${info.league_name})`, `/match.html?id=${match?.id}`);
+  if (info) {
+    await logActivityLinked(c.env.DB, user, `Created match ${info.home_name} vs ${info.away_name} (${info.league_name})`,
+      `/match.html?id=${match?.id}`, { subtitle: `${b.match_date}${b.location ? ` · ${b.location.trim()}` : ""}` });
+  }
   return c.json(match, 201);
 });
 
@@ -193,6 +200,7 @@ matches.put("/:id/lineup", async (c) => {
   const warnings: string[] = [];
   const players = await c.env.DB.prepare("SELECT * FROM players").all<Player>();
   const pmap = new Map((players.results ?? []).map((p) => [p.id, p]));
+  const lineupDetails = await buildLineupChangeDetails(c.env.DB, lineups, pmap);
   for (const lu of lineups) {
     const line = await c.env.DB.prepare("SELECT * FROM match_lines WHERE id = ?").bind(lu.match_line_id).first<MatchLine>();
     const hp = [pmap.get(lu.home_player1_id!), line?.is_doubles ? pmap.get(lu.home_player2_id!) : undefined].filter(Boolean) as Player[];
@@ -218,7 +226,9 @@ matches.put("/:id/lineup", async (c) => {
     `SELECT ht.name as home_name, at.name as away_name FROM matches m
      JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
   ).bind(matchId).first<{ home_name: string; away_name: string }>();
-  if (info) await logActivity(c.env.DB, user, `Updated lineup for ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
+  if (info && lineupDetails) {
+    await logActivityLinked(c.env.DB, user, `Updated lineup for ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`, lineupDetails);
+  }
   return c.json({ ok: true, warnings });
 });
 
@@ -236,13 +246,17 @@ matches.put("/:id/scores", async (c) => {
     home_set3?: number; away_set3?: number; home_tb3?: number; away_tb3?: number;
     home_players_text?: string; away_players_text?: string;
   }> }>();
-  const errors = await applyScores(c.env.DB, matchId, scores, user.id);
-  if (errors.length) return c.json({ error: errors.join("; ") }, 400);
   const info = await c.env.DB.prepare(
     `SELECT ht.name as home_name, at.name as away_name FROM matches m
      JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
   ).bind(matchId).first<{ home_name: string; away_name: string }>();
-  if (info) await logActivity(c.env.DB, user, `Submitted scores for ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
+  const scoreDetails = info ? await buildScoreChangeDetails(c.env.DB, scores, info.home_name, info.away_name) : null;
+  const errors = await applyScores(c.env.DB, matchId, scores, user.id);
+  if (errors.length) return c.json({ error: errors.join("; ") }, 400);
+  if (info && scoreDetails) {
+    const title = scoreDetails.subtitle?.includes("→") ? `Updated scores for ${info.home_name} vs ${info.away_name}` : `Submitted scores for ${info.home_name} vs ${info.away_name}`;
+    await logActivityLinked(c.env.DB, user, title, `/match.html?id=${matchId}`, scoreDetails);
+  }
   return c.json({ ok: true });
 });
 

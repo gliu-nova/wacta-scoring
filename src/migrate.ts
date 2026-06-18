@@ -53,6 +53,7 @@ const TABLES = [
 const ALTERS = [
   "ALTER TABLE lineups ADD COLUMN home_players_text TEXT",
   "ALTER TABLE lineups ADD COLUMN away_players_text TEXT",
+  "ALTER TABLE activity_log ADD COLUMN details TEXT",
 ];
 
 export async function ensureTables(db: D1Database): Promise<void> {

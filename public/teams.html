@@ -3,14 +3,17 @@
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
 import { api, getUser, page, esc, alert } from "/js/ui.js";
+import { fetchActivityFromUrl, renderChangeBanner, rowHighlight, HL_CLASS } from "/js/activity-highlight.js";
 if ((await getUser())?.role !== "admin") location.href="/login.html";
 const leagues = await api("/admin/leagues");
 const lmap = Object.fromEntries(leagues.map(l => [l.id, l.name]));
 let teams = [];
 let editId = null;
 
+const activity = await fetchActivityFromUrl();
 page("Teams", `<div class="flex justify-between mb-6"><h1 class="text-2xl font-bold">Teams</h1></div>
 <p class="text-sm text-slate-500 mb-4">Rename teams here — past match results and standings stay linked.</p>
+<div id="change-banner"></div>
 <div id="msg" hidden></div>
 <div id="list" class="bg-white rounded-xl border mb-6"></div>
 <h2 class="font-semibold mb-2">Add Team</h2>
@@ -28,11 +31,18 @@ page("Teams", `<div class="flex justify-between mb-6"><h1 class="text-2xl font-b
   </div>
 </div></div>`, "Admin");
 
+const hl = activity?.details?.highlights ?? [];
 function load() {
   document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Team</th><th class="p-3 text-left">League</th><th class="p-3">Actions</th></tr></thead><tbody>${
-    teams.map((t) => `<tr class="border-t"><td class="p-3 font-medium">${esc(t.name)}</td><td class="p-3 text-slate-500">${esc(lmap[t.league_id])}</td>
+    teams.map((t) => {
+      const hName = rowHighlight(hl, t.id, "name");
+      const hLeague = rowHighlight(hl, t.id, "league");
+      return `<tr class="border-t" data-team-id="${t.id}"><td class="p-3 font-medium ${hName}">${esc(t.name)}</td><td class="p-3 text-slate-500 ${hLeague}">${esc(lmap[t.league_id])}</td>
     <td class="p-3"><button data-id="${t.id}" data-name="${esc(t.name)}" data-league="${t.league_id}" class="text-blue-600 text-sm mr-3 edit">Edit</button>
-    <button data-id="${t.id}" class="text-red-600 text-sm del">Delete</button></td></tr>`).join("")}</tbody></table>`;
+    <button data-id="${t.id}" class="text-red-600 text-sm del">Delete</button></td></tr>`;
+    }).join("")}</tbody></table>`;
+  const row = hl.length && document.querySelector(`tr[data-team-id="${hl[0].row}"]`);
+  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
   document.querySelectorAll(".edit").forEach((b) => {
     b.onclick = () => {
       editId = Number(b.dataset.id);
@@ -73,6 +83,7 @@ document.getElementById("form").onsubmit = async (e) => {
   load();
 };
 
+if (activity) document.getElementById("change-banner").innerHTML = renderChangeBanner(activity);
 teams = await api("/admin/teams");
 load();
 </script></body></html>

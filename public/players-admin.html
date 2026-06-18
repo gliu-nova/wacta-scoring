@@ -3,13 +3,17 @@
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
 import { api, getUser, page, esc, alert } from "/js/ui.js";
+import { fetchActivityFromUrl, renderChangeBanner, rowHighlight } from "/js/activity-highlight.js";
 if ((await getUser())?.role !== "admin") location.href="/login.html";
 const teams = await api("/admin/teams");
 const tmap = Object.fromEntries(teams.map(t => [t.id, t.name]));
 let editId = null;
 
+const activity = await fetchActivityFromUrl();
+const hl = activity?.details?.highlights ?? [];
 page("Players", `<h1 class="text-2xl font-bold mb-2">Players</h1>
 <p class="text-sm text-slate-500 mb-4">Edit names or move players between teams — match history stays linked by player ID.</p>
+<div id="change-banner"></div>
 <div id="msg" hidden></div>
 <input id="q" placeholder="Search..." class="border rounded-lg px-3 py-2 mb-4 w-full max-w-xs">
 <div id="list" class="bg-white rounded-xl border mb-6"></div>
@@ -40,10 +44,10 @@ async function load(q = "") {
   const players = await api("/admin/players" + (q ? `?q=${encodeURIComponent(q)}` : ""));
   document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr>
     <th class="p-3 text-left">Name</th><th class="p-3">NTRP</th><th class="p-3">Team</th><th class="p-3">Actions</th></tr></thead><tbody>${
-    players.map((p) => `<tr class="border-t">
-      <td class="p-3"><a href="/player.html?id=${p.id}" class="text-emerald-700 font-medium">${esc(p.first_name)} ${esc(p.last_name)}</a></td>
-      <td class="p-3">${p.ntrp_rating.toFixed(1)}</td>
-      <td class="p-3 text-slate-500">${esc(tmap[p.team_id] || "—")}</td>
+    players.map((p) => `<tr class="border-t" data-player-id="${p.id}">
+      <td class="p-3 ${rowHighlight(hl, p.id, "name")}"><a href="/player.html?id=${p.id}" class="text-emerald-700 font-medium">${esc(p.first_name)} ${esc(p.last_name)}</a></td>
+      <td class="p-3 ${rowHighlight(hl, p.id, "ntrp")}">${p.ntrp_rating.toFixed(1)}</td>
+      <td class="p-3 text-slate-500 ${rowHighlight(hl, p.id, "team")}">${esc(tmap[p.team_id] || "—")}</td>
       <td class="p-3">
         <button data-id="${p.id}" data-first="${esc(p.first_name)}" data-last="${esc(p.last_name)}"
           data-ntrp="${p.ntrp_rating}" data-team="${p.team_id ?? ""}" data-email="${esc(p.email || "")}"
@@ -51,6 +55,8 @@ async function load(q = "") {
         <button data-id="${p.id}" class="text-red-600 text-sm del">Delete</button>
       </td></tr>`).join("")
   }</tbody></table>`;
+  const row = hl.length && document.querySelector(`tr[data-player-id="${hl[0].row}"]`);
+  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
   document.querySelectorAll(".edit").forEach((b) => {
     b.onclick = () => {
       editId = Number(b.dataset.id);
@@ -99,5 +105,6 @@ document.getElementById("form").onsubmit = async (e) => {
   e.target.reset();
   load(document.getElementById("q").value);
 };
+if (activity) document.getElementById("change-banner").innerHTML = renderChangeBanner(activity);
 load();
 </script></body></html>

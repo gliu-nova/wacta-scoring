@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getUser, hashPassword } from "../auth";
-import { logActivity } from "../services/activity";
+import { logActivity, logActivityLinked } from "../services/activity";
+import { buildFieldChangeDetails } from "../services/changes";
 import { getPendingCount } from "../services/pending";
 import type { Env, League, LeagueLineTemplate, Player, Team, User } from "../types";
 
@@ -96,11 +97,22 @@ admin.post("/teams", async (c) => {
 });
 admin.put("/teams/:id", async (c) => {
   if (!(await requireAdmin(c))) return c.json({ error: "Forbidden" }, 403);
+  const id = Number(c.req.param("id"));
   const { name, league_id } = await c.req.json<{ name?: string; league_id?: number }>();
-  await c.env.DB.prepare("UPDATE teams SET name = ?, league_id = ? WHERE id = ?")
-    .bind(name?.trim(), league_id, Number(c.req.param("id"))).run();
+  const before = await c.env.DB.prepare("SELECT * FROM teams WHERE id = ?").bind(id).first<Team>();
   const user = await getUser(c as never);
-  await logActivity(c.env.DB, user, `Updated team ${name?.trim()}`);
+  const changes: Array<{ field: string; before: string; after: string; cell?: string }> = [];
+  if (before && name?.trim() !== before.name) {
+    changes.push({ field: "Name", before: before.name, after: name?.trim() ?? "", cell: "name" });
+  }
+  if (before && league_id !== before.league_id) {
+    const leagues = await c.env.DB.prepare("SELECT id, name FROM leagues").all<{ id: number; name: string }>();
+    const lmap = new Map((leagues.results ?? []).map((l) => [l.id, l.name]));
+    changes.push({ field: "League", before: lmap.get(before.league_id) ?? "?", after: lmap.get(league_id!) ?? "?", cell: "league" });
+  }
+  await c.env.DB.prepare("UPDATE teams SET name = ?, league_id = ? WHERE id = ?").bind(name?.trim(), league_id, id).run();
+  const details = buildFieldChangeDetails("team", String(id), changes);
+  if (details) await logActivityLinked(c.env.DB, user, `Updated team ${name?.trim()}`, "/teams.html", details);
   return c.json({ ok: true });
 });
 admin.delete("/teams/:id", async (c) => {
@@ -134,11 +146,31 @@ admin.post("/players", async (c) => {
 });
 admin.put("/players/:id", async (c) => {
   if (!(await requireAdmin(c))) return c.json({ error: "Forbidden" }, 403);
+  const id = Number(c.req.param("id"));
   const b = await c.req.json<{ first_name?: string; last_name?: string; ntrp_rating?: number; team_id?: number | null; email?: string }>();
-  await c.env.DB.prepare("UPDATE players SET first_name=?, last_name=?, ntrp_rating=?, team_id=?, email=? WHERE id=?")
-    .bind(b.first_name?.trim(), b.last_name?.trim(), b.ntrp_rating ?? 3.5, b.team_id ?? null, b.email?.trim() || null, Number(c.req.param("id"))).run();
+  const before = await c.env.DB.prepare("SELECT * FROM players WHERE id = ?").bind(id).first<Player>();
   const user = await getUser(c as never);
-  await logActivity(c.env.DB, user, `Updated player ${b.first_name?.trim()} ${b.last_name?.trim()}`);
+  const teams = await c.env.DB.prepare("SELECT id, name FROM teams").all<{ id: number; name: string }>();
+  const tmap = new Map((teams.results ?? []).map((t) => [t.id, t.name]));
+  const teamLabel = (tid: number | null) => (tid ? tmap.get(tid) ?? "?" : "—");
+  const changes: Array<{ field: string; before: string; after: string; cell?: string }> = [];
+  if (before) {
+    const full = (p: Player) => `${p.first_name} ${p.last_name}`;
+    const afterFull = `${b.first_name?.trim()} ${b.last_name?.trim()}`;
+    if (full(before) !== afterFull) {
+      changes.push({ field: "Name", before: full(before), after: afterFull, cell: "name" });
+    }
+    if (before.ntrp_rating !== (b.ntrp_rating ?? 3.5)) {
+      changes.push({ field: "NTRP", before: before.ntrp_rating.toFixed(1), after: (b.ntrp_rating ?? 3.5).toFixed(1), cell: "ntrp" });
+    }
+    if (before.team_id !== (b.team_id ?? null)) {
+      changes.push({ field: "Team", before: teamLabel(before.team_id), after: teamLabel(b.team_id ?? null), cell: "team" });
+    }
+  }
+  await c.env.DB.prepare("UPDATE players SET first_name=?, last_name=?, ntrp_rating=?, team_id=?, email=? WHERE id=?")
+    .bind(b.first_name?.trim(), b.last_name?.trim(), b.ntrp_rating ?? 3.5, b.team_id ?? null, b.email?.trim() || null, id).run();
+  const details = buildFieldChangeDetails("player", String(id), changes);
+  if (details) await logActivityLinked(c.env.DB, user, `Updated player ${b.first_name?.trim()} ${b.last_name?.trim()}`, "/players-admin.html", details);
   return c.json({ ok: true });
 });
 admin.delete("/players/:id", async (c) => {

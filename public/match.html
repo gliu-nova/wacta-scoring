@@ -3,13 +3,20 @@
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
 import { api, getUser, page, esc, alert } from "/js/ui.js";
+import { fetchActivityFromUrl, renderChangeBanner, cellHighlight, HL_CLASS } from "/js/activity-highlight.js";
+
 const id = new URLSearchParams(location.search).get("id");
-const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
+const activityQ = new URLSearchParams(location.search).get("activity");
+const activitySuffix = activityQ ? `&activity=${activityQ}` : "";
+const [data, user, activity] = await Promise.all([api("/matches/"+id), getUser(), fetchActivityFromUrl()]);
 const m = data.match;
+const hl = activity?.details?.highlights ?? [];
 const loginUrl = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+
 page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter Match Results</a>
 <h1 class="text-2xl font-bold mt-2" id="match-title">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
 <p class="text-slate-500 mb-4" id="match-meta">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span>${m.location ? ` · ${esc(m.location)}` : ""}</p>
+<div id="change-banner"></div>
 <div id="notice" class="mb-4"></div>
 <div class="flex flex-wrap gap-3 mb-6" id="actions"></div>
 <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr>
@@ -32,6 +39,11 @@ page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter 
     <button id="cancel-edit" class="px-4 py-2 rounded-lg border">Cancel</button>
   </div>
 </div></div>`, "Enter Match Results");
+
+if (activity) document.getElementById("change-banner").innerHTML = renderChangeBanner(activity);
+const metaChanged = hl.some((h) => h.row === "meta" && h.cells?.length);
+if (metaChanged) document.getElementById("match-meta").classList.add(HL_CLASS, "inline-block", "px-2", "py-1", "rounded");
+
 const players = await api("/admin/players");
 const pmap = Object.fromEntries(players.map(p => [p.id, p.first_name+" "+p.last_name]));
 if (!user) {
@@ -40,8 +52,8 @@ if (!user) {
   </div>`;
 } else {
   document.getElementById("actions").innerHTML = `
-    <a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Edit Lineup</a>
-    <a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>
+    <a href="/lineup.html?id=${id}${activitySuffix}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Edit Lineup</a>
+    <a href="/scores.html?id=${id}${activitySuffix}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>
     <button id="edit-match" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Edit Match Details</button>`;
   document.getElementById("edit-match").onclick = async () => {
     document.getElementById("edit-date").value = m.match_date;
@@ -80,6 +92,17 @@ document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,resu
     : result.winner==="tie" ? "<span class='text-slate-600 font-medium'>Tie</span>"
     : result.winner==="home" ? `<span class="text-green-700 font-medium">${esc(m.home_name)} W</span>`
     : `<span class="text-green-700 font-medium">${esc(m.away_name)} W</span>`;
-  return `<tr class="border-t"><td class="p-3 font-medium">${esc(line.name)}</td><td class="p-3">${esc(hp)}</td><td class="p-3">${esc(ap)}</td><td class="p-3 font-mono">${sc}</td><td class="p-3">${res}</td></tr>`;
+  const hHp = cellHighlight(hl, line.id, "home_players");
+  const hAp = cellHighlight(hl, line.id, "away_players");
+  const hSc = cellHighlight(hl, line.id, "score");
+  const hRes = cellHighlight(hl, line.id, "result");
+  return `<tr class="border-t" data-line-id="${line.id}">
+    <td class="p-3 font-medium">${esc(line.name)}</td>
+    <td class="p-3 ${hHp}">${esc(hp)}</td>
+    <td class="p-3 ${hAp}">${esc(ap)}</td>
+    <td class="p-3 font-mono ${hSc}">${sc}</td>
+    <td class="p-3 ${hRes}">${res}</td></tr>`;
 }).join("");
+const firstHl = document.querySelector(`tr[data-line-id] td.${HL_CLASS.split(" ")[0]}`);
+if (firstHl) firstHl.closest("tr")?.scrollIntoView({ behavior: "smooth", block: "center" });
 </script></body></html>

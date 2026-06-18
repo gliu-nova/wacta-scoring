@@ -4,10 +4,13 @@
 <script type="module">
 import { api, getUser, page, esc, alert } from "/js/ui.js";
 import { renderLineCards, parseScoresForm } from "/js/score-form.js";
+import { fetchActivityFromUrl, renderChangeBanner, fieldHighlight, HL_INPUT } from "/js/activity-highlight.js";
+
 const id = new URLSearchParams(location.search).get("id");
-const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
+const [data, user, activity] = await Promise.all([api("/matches/"+id), getUser(), fetchActivityFromUrl()]);
 const m = data.match;
-const loginUrl = `/login.html?next=${encodeURIComponent("/scores.html?id=" + id)}`;
+const hl = activity?.details?.highlights ?? [];
+const loginUrl = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 
 if (!user) {
   page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
@@ -16,12 +19,30 @@ if (!user) {
     <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
   </div>`, "Enter Match Results");
 } else {
-  page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
+  page("Scores", `<a href="/match.html?id=${id}${activity ? "&activity=" + activity.id : ""}" class="text-emerald-600 text-sm">← Match</a>
   <h1 class="text-2xl font-bold my-2">Edit Scores</h1>
   <p class="text-sm text-slate-500 mb-4">Changes publish immediately and update standings.</p>
   <p class="text-slate-500 mb-4">${esc(m.home_name)} vs ${esc(m.away_name)} · ${m.match_date}</p>
+  <div id="change-banner"></div>
   <div id="msg" hidden></div><form id="form" class="space-y-4">${renderLineCards(data.lineData, m.home_name, m.away_name)}</form>
   <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Scores</button>`, "Enter Match Results");
+
+  if (activity) document.getElementById("change-banner").innerHTML = renderChangeBanner(activity);
+
+  for (const { line } of data.lineData) {
+    const row = String(line.id);
+    for (const [field, n] of [["set1", "1"], ["set2", "2"], ["set3", "3"]]) {
+      if (!fieldHighlight(hl, row, field)) continue;
+      document.querySelector(`input[name="h${n}_${line.id}"]`)?.classList.add(...HL_INPUT.split(" "));
+      document.querySelector(`input[name="a${n}_${line.id}"]`)?.classList.add(...HL_INPUT.split(" "));
+    }
+    if (fieldHighlight(hl, row, "winner")) {
+      document.querySelectorAll(`input[name="winner_${line.id}"]`).forEach((el) => {
+        el.closest("label")?.classList.add("bg-amber-50", "ring-2", "ring-amber-400", "rounded", "px-2");
+      });
+    }
+  }
+
   document.getElementById("form").onsubmit = async (e) => {
     e.preventDefault(); const fd = new FormData(e.target);
     try {
