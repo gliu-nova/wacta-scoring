@@ -1,52 +1,69 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-slate-50"><div id="app"></div>
+<body class="bg-slate-50">
 <script type="module">
 import { api, getUser, page, esc, downloadCsv } from "/js/ui.js";
 
 const user = await getUser();
-const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
 const base = location.origin + "/api/export";
 
 page("Export Data", `<h1 class="text-2xl font-bold mb-2">Export Data</h1>
-<p class="text-slate-500 mb-8">Download CSV files or set up manual Google Sheets sync (updates only when you click refresh).</p>
+<p class="text-slate-500 mb-8">Download CSV files or sync to Google Sheets manually (only updates when you click refresh in Sheets).</p>
+<div id="err" hidden class="mb-4 p-3 bg-red-100 text-red-800 rounded-lg text-sm"></div>
 
 <h2 class="text-lg font-semibold mb-3">Download CSV</h2>
 <div class="bg-white rounded-xl border p-5 mb-8 space-y-4">
   <div class="flex flex-wrap gap-3">
     <button id="dl-standings" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">Standings (all divisions)</button>
     <button id="dl-matches" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm">Match Results (all)</button>
-    ${user?.role === "admin" ? `<button id="dl-all" class="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm">Everything</button>` : ""}
+    <button id="dl-all" class="px-4 py-2 bg-slate-600 text-white rounded-lg text-sm hidden">Everything</button>
   </div>
   <div>
     <p class="text-sm text-slate-500 mb-2">Per division:</p>
-    <div class="flex flex-wrap gap-2" id="league-btns"></div>
+    <div class="flex flex-wrap gap-2" id="league-btns"><span class="text-slate-400 text-sm">Loading…</span></div>
   </div>
 </div>
 
-<h2 class="text-lg font-semibold mb-3">Google Sheets (manual refresh)</h2>
+<h2 class="text-lg font-semibold mb-3">Google Sheets setup (manual refresh)</h2>
 <div class="bg-white rounded-xl border p-5 mb-4 text-sm text-slate-700 space-y-4">
-  <p>Your spreadsheet <strong>won't auto-update</strong> — it only refreshes when you click a button in Google Sheets. If the website goes down, your sheet keeps its last snapshot.</p>
+  <p>Your spreadsheet does <strong>not</strong> auto-update. It only refreshes when you click a button inside Google Sheets. If this website goes offline, your sheet keeps its last saved data.</p>
   <ol class="list-decimal list-inside space-y-2 text-slate-600">
-    <li>Open your Google Sheet → <strong>Extensions → Apps Script</strong></li>
-    <li>Paste the script below and save</li>
-    <li>Run <code class="bg-slate-100 px-1 rounded">refreshWactaData</code> once to authorize, then add a drawing/button assigned to that function</li>
-    <li>Click the button whenever you want the latest data from the website</li>
+    <li>Open your Google Sheet</li>
+    <li>Go to <strong>Extensions → Apps Script</strong></li>
+    <li>Delete any code there, paste the script from the box below, and click <strong>Save</strong></li>
+    <li>Click <strong>Run</strong> on <code class="bg-slate-100 px-1 rounded">refreshWactaData</code> once (approve permissions when asked)</li>
+    <li>In your sheet: <strong>Insert → Drawing</strong>, make a button shape, save it, click the ⋮ on the drawing → <strong>Assign script</strong> → type <code class="bg-slate-100 px-1 rounded">refreshWactaData</code></li>
+    <li>Click that drawing whenever you want fresh data from the website</li>
   </ol>
-  <p class="text-xs text-slate-500">Creates/updates tabs: one per division standings + one "Match Results" tab.</p>
-  <textarea id="script" readonly rows="16" class="w-full font-mono text-xs border rounded-lg p-3 bg-slate-50"></textarea>
-  <button id="copy-script" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Copy Script</button>
+  <p class="text-xs text-slate-500">This creates one standings tab per division plus a Match Results tab.</p>
+  <label class="block font-medium text-slate-800">Copy this script:</label>
+  <textarea id="script" readonly rows="18" class="w-full font-mono text-xs border rounded-lg p-3 bg-slate-50 text-slate-800">Loading script…</textarea>
+  <button type="button" id="copy-script" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Copy Script</button>
 </div>
 
 <h2 class="text-lg font-semibold mb-3">Public CSV URLs</h2>
 <div class="bg-white rounded-xl border p-5 text-sm space-y-2" id="urls"></div>`, user?.role === "admin" ? "Admin" : "Standings");
 
-document.getElementById("dl-standings").onclick = () => leagues.forEach((lg) => downloadCsv(`/export/standings.csv?league_id=${lg.id}`));
-document.getElementById("dl-matches").onclick = () => downloadCsv("/export/matches.csv");
-document.getElementById("dl-all")?.onclick = () => downloadCsv("/export/all.csv");
+if (user?.role === "admin") document.getElementById("dl-all").classList.remove("hidden");
 
-document.getElementById("league-btns").innerHTML = leagues.map((lg) =>
-  `<button data-lg="${lg.id}" class="px-3 py-1.5 border rounded-lg text-sm hover:bg-slate-50">${esc(lg.name)}</button>`).join("");
+let leagues = [];
+try {
+  leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
+} catch (e) {
+  document.getElementById("err").hidden = false;
+  document.getElementById("err").textContent = "Could not load divisions: " + e.message;
+}
+
+document.getElementById("dl-standings").onclick = () => {
+  if (!leagues.length) return alert("No divisions loaded");
+  leagues.forEach((lg) => downloadCsv(`/export/standings.csv?league_id=${lg.id}`));
+};
+document.getElementById("dl-matches").onclick = () => downloadCsv("/export/matches.csv");
+document.getElementById("dl-all").onclick = () => downloadCsv("/export/all.csv");
+
+document.getElementById("league-btns").innerHTML = leagues.length
+  ? leagues.map((lg) => `<button type="button" data-lg="${lg.id}" class="px-3 py-1.5 border rounded-lg text-sm hover:bg-slate-50">${esc(lg.name)}</button>`).join("")
+  : `<span class="text-slate-400 text-sm">No divisions found</span>`;
 document.getElementById("league-btns").onclick = (e) => {
   const btn = e.target.closest("[data-lg]");
   if (!btn) return;
@@ -59,12 +76,12 @@ const LEAGUES = [${leagues.map((l) => `{ id: ${l.id}, name: ${JSON.stringify(l.n
 
 function refreshWactaData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  LEAGUES.forEach((lg) => {
-    const csv = UrlFetchApp.fetch(BASE + "/standings.csv?league_id=" + lg.id).getContentText();
-    const sheet = getOrCreateSheet(ss, "Standings " + lg.name);
+  LEAGUES.forEach(function(lg) {
+    var csv = UrlFetchApp.fetch(BASE + "/standings.csv?league_id=" + lg.id).getContentText();
+    var sheet = getOrCreateSheet(ss, "Standings " + lg.name);
     writeCsv(sheet, csv);
   });
-  const matches = UrlFetchApp.fetch(BASE + "/matches.csv").getContentText();
+  var matches = UrlFetchApp.fetch(BASE + "/matches.csv").getContentText();
   writeCsv(getOrCreateSheet(ss, "Match Results"), matches);
   SpreadsheetApp.getUi().alert("WACTA data refreshed!");
 }
@@ -75,19 +92,26 @@ function getOrCreateSheet(ss, name) {
 
 function writeCsv(sheet, csv) {
   sheet.clear();
-  const rows = Utilities.parseCsv(csv);
+  var rows = Utilities.parseCsv(csv);
   if (rows.length) sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 }`;
-document.getElementById("script").value = script;
-document.getElementById("copy-script").onclick = () => {
-  navigator.clipboard.writeText(script);
-  document.getElementById("copy-script").textContent = "Copied!";
-  setTimeout(() => { document.getElementById("copy-script").textContent = "Copy Script"; }, 2000);
+
+document.getElementById("script").value = leagues.length ? script : "// Could not load divisions — open export.html on the website to get the full script.";
+document.getElementById("copy-script").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById("script").value);
+    document.getElementById("copy-script").textContent = "Copied!";
+    setTimeout(() => { document.getElementById("copy-script").textContent = "Copy Script"; }, 2000);
+  } catch {
+    document.getElementById("script").select();
+    alert("Select all text in the box and copy (Cmd+C)");
+  }
 };
 
 document.getElementById("urls").innerHTML = [
-  ["Standings (per division)", `${base}/standings.csv?league_id=LEAGUE_ID`],
+  ["Standings (replace LEAGUE_ID)", `${base}/standings.csv?league_id=1`],
   ["Match results (all submitted)", `${base}/matches.csv`],
-  ["Match results (one division)", `${base}/matches.csv?league_id=LEAGUE_ID`],
-].map(([label, url]) => `<div><span class="text-slate-500">${esc(label)}:</span><br><code class="text-xs break-all">${esc(url)}</code></div>`).join("");
-</script></body></html>
+  ["Match results (one division)", `${base}/matches.csv?league_id=1`],
+].map(([label, url]) => `<div><span class="text-slate-500">${esc(label)}:</span><br><code class="text-xs break-all text-slate-800">${esc(url)}</code></div>`).join("");
+</script>
+</body></html>
