@@ -42,9 +42,17 @@ const TABLES = [
     winner TEXT NOT NULL, submitted_by_id INTEGER, submitted_at TEXT NOT NULL DEFAULT (datetime('now')))`,
 ];
 
+const ALTERS = [
+  "ALTER TABLE lineups ADD COLUMN home_players_text TEXT",
+  "ALTER TABLE lineups ADD COLUMN away_players_text TEXT",
+];
+
 export async function ensureTables(db: D1Database): Promise<void> {
   if (done) return;
   await db.batch(TABLES.map((sql) => db.prepare(sql)));
+  for (const sql of ALTERS) {
+    try { await db.prepare(sql).run(); } catch { /* column exists */ }
+  }
   await seedDefaults(db);
   done = true;
 }

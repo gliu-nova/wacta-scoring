@@ -42,6 +42,7 @@ export type Lineup = {
   id: number; match_line_id: number;
   home_player1_id: number | null; home_player2_id: number | null;
   away_player1_id: number | null; away_player2_id: number | null;
+  home_players_text: string | null; away_players_text: string | null;
   updated_at: string;
 };
 export type LineResult = {

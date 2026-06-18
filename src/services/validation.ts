@@ -43,6 +43,22 @@ export function validateLineScore(s: {
   return { ok: errors.length === 0, errors };
 }
 
+export function hasLineScores(s: {
+  home_set1: number; away_set1: number; home_set2: number; away_set2: number;
+  home_set3: number | null; away_set3: number | null;
+}): boolean {
+  return !!(s.home_set1 || s.away_set1 || s.home_set2 || s.away_set2 || s.home_set3 || s.away_set3);
+}
+
+export function validateLineScoreEntry(
+  s: Parameters<typeof validateLineScore>[0],
+  winner?: Side | null,
+): { ok: boolean; errors: string[] } {
+  if (winner !== "home" && winner !== "away") return { ok: false, errors: ["Winner required"] };
+  if (!hasLineScores(s)) return { ok: true, errors: [] };
+  return validateLineScore(s);
+}
+
 export function determineWinner(s: Parameters<typeof validateLineScore>[0]): Side {
   const sets: [number, number, number | null, number | null][] = [
     [s.home_set1, s.away_set1, s.home_tb1, s.away_tb1],
