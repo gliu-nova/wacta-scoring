@@ -55,8 +55,10 @@ export function validateLineScoreEntry(
   winner?: Side | null,
 ): { ok: boolean; errors: string[] } {
   if (winner !== "home" && winner !== "away") return { ok: false, errors: ["Winner required"] };
-  if (!hasLineScores(s)) return { ok: true, errors: [] };
-  return validateLineScore(s);
+  for (const n of [s.home_set1, s.away_set1, s.home_set2, s.away_set2, s.home_set3, s.away_set3]) {
+    if (n != null && n < 0) return { ok: false, errors: ["Scores cannot be negative"] };
+  }
+  return { ok: true, errors: [] };
 }
 
 export function determineWinner(s: Parameters<typeof validateLineScore>[0]): Side {
