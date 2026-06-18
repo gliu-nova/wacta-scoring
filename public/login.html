@@ -22,7 +22,7 @@ document.getElementById("form").onsubmit = async (e) => {
   try {
     const u = await api("/auth/login", { method: "POST", body: JSON.stringify({ username: fd.get("username"), password: fd.get("password") }) });
     const next = new URLSearchParams(location.search).get("next");
-    location.href = next || (u.role === "admin" ? "/admin.html" : "/calendar.html");
+    location.href = next || (u.role === "admin" ? "/admin.html" : "/enter.html");
   } catch (err) { alert(document.getElementById("msg"), err.message); }
 };
 </script></body></html>

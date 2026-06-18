@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { canEditMatch, getUser } from "../auth";
+import { getUser } from "../auth";
 import { createMatchLines, updateMatchStatus } from "../services/matches";
 import { computeStandings } from "../services/standings";
-import { canSubmitScores, determineWinner, ratingWarnings, validateLineScore } from "../services/validation";
+import { determineWinner, ratingWarnings, validateLineScore } from "../services/validation";
 import type { Env, Lineup, LineResult, Match, MatchLine, Player, User } from "../types";
 
 const matches = new Hono<{ Bindings: Env }>();
@@ -38,14 +38,13 @@ matches.get("/:id", async (c) => {
     lineData.push({ line, lineup, result });
   }
   const user = await getUser(c);
-  const m = match as Match & { home_name: string; away_name: string };
-  const canEdit = user ? canEditMatch(user, m.home_team_id, m.away_team_id) : false;
-  return c.json({ match, lineData, can_edit: canEdit, can_score: canEdit && canSubmitScores(m.match_date) });
+  const loggedIn = !!user;
+  return c.json({ match, lineData, can_edit: loggedIn, can_score: loggedIn });
 });
 
 matches.post("/", async (c) => {
   const user = await getUser(c);
-  if (!user || user.role !== "admin") return c.json({ error: "Forbidden" }, 403);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
   const b = await c.req.json<{ league_id?: number; home_team_id?: number; away_team_id?: number; match_date?: string; location?: string }>();
   if (b.home_team_id === b.away_team_id) return c.json({ error: "Teams must differ" }, 400);
   const r = await c.env.DB.prepare(
@@ -61,7 +60,7 @@ matches.put("/:id/lineup", async (c) => {
   if (!user) return c.json({ error: "Unauthorized" }, 401);
   const matchId = Number(c.req.param("id"));
   const match = await c.env.DB.prepare("SELECT * FROM matches WHERE id = ?").bind(matchId).first<Match>();
-  if (!match || !canEditMatch(user, match.home_team_id, match.away_team_id)) return c.json({ error: "Forbidden" }, 403);
+  if (!match) return c.json({ error: "Not found" }, 404);
   const { lineups } = await c.req.json<{ lineups: Array<{ match_line_id: number; home_player1_id?: number; home_player2_id?: number; away_player1_id?: number; away_player2_id?: number }> }>();
   const warnings: string[] = [];
   const players = await c.env.DB.prepare("SELECT * FROM players").all<Player>();
@@ -89,8 +88,7 @@ matches.put("/:id/scores", async (c) => {
   if (!user) return c.json({ error: "Unauthorized" }, 401);
   const matchId = Number(c.req.param("id"));
   const match = await c.env.DB.prepare("SELECT * FROM matches WHERE id = ?").bind(matchId).first<Match>();
-  if (!match || !canEditMatch(user, match.home_team_id, match.away_team_id)) return c.json({ error: "Forbidden" }, 403);
-  if (!canSubmitScores(match.match_date)) return c.json({ error: "Cannot submit before match date" }, 400);
+  if (!match) return c.json({ error: "Not found" }, 404);
   const { scores } = await c.req.json<{ scores: Array<{
     match_line_id: number;
     home_set1: number; away_set1: number; home_tb1?: number; away_tb1?: number;

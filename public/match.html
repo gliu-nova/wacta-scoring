@@ -7,32 +7,23 @@ const id = new URLSearchParams(location.search).get("id");
 const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
 const m = data.match;
 const loginUrl = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
-page("Match", `<a href="/calendar.html" class="text-emerald-600 text-sm">← Calendar</a>
+page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter Results</a>
 <h1 class="text-2xl font-bold mt-2">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
 <p class="text-slate-500 mb-4">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span>${m.location ? ` · ${esc(m.location)}` : ""}</p>
 <div id="notice" class="mb-4"></div>
 <div class="flex flex-wrap gap-3 mb-6" id="actions"></div>
 <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr>
-<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Calendar");
+<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Enter Results");
 const players = await api("/admin/players");
 const pmap = Object.fromEntries(players.map(p => [p.id, p.first_name+" "+p.last_name]));
-const actions = document.getElementById("actions");
-const notice = document.getElementById("notice");
 if (!user) {
-  notice.innerHTML = `<div class="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-lg text-sm">
-    <a href="${loginUrl}" class="font-semibold text-emerald-700 underline">Log in</a> as admin or team captain to enter lineups and scores.
+  document.getElementById("notice").innerHTML = `<div class="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-lg text-sm">
+    <a href="${loginUrl}" class="font-semibold text-emerald-700 underline">Log in</a> to edit lineups or scores.
   </div>`;
-} else if (!data.can_edit) {
-  notice.innerHTML = `<div class="bg-slate-100 border text-slate-600 p-4 rounded-lg text-sm">You can view this match but only team captains and admins can enter results.</div>`;
 } else {
-  actions.innerHTML = `
-    <a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Set Lineup</a>
-    ${data.can_score
-      ? `<a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">Enter Scores</a>`
-      : `<span class="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Scores open on ${m.match_date}</span>`}`;
-  if (!data.can_score) {
-    notice.innerHTML = `<div class="bg-blue-50 border border-blue-200 text-blue-900 p-4 rounded-lg text-sm">Set the lineup now. Score entry unlocks on the match date.</div>`;
-  }
+  document.getElementById("actions").innerHTML = `
+    <a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Set Lineup</a>
+    <a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>`;
 }
 document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,result}) => {
   const hp = lineup ? [lineup.home_player1_id,lineup.home_player2_id].filter(Boolean).map(i=>pmap[i]).join(", ") : "—";

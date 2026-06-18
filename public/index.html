@@ -10,23 +10,20 @@ import { api, getUser, page, esc } from "/js/ui.js";
 const user = await getUser();
 page("WACTA Scoring", `
   <h1 class="text-2xl font-bold mb-2">Private Tennis League Scoring</h1>
-  <p class="text-slate-600 mb-8">Schedules, lineups, scores, and standings.</p>
-  <div id="score-banner" class="mb-6"></div>
-  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="cards"></div>
+  <p class="text-slate-600 mb-8">Record match results, view standings, and track players.</p>
+  <a href="${user ? "/enter.html" : "/login.html?next=%2Fenter.html"}" class="block mb-8 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
+    <h2 class="text-xl font-bold">Enter Match Results</h2>
+    <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores" : "Log in to record scores"}</p>
+  </a>
+  <div class="grid sm:grid-cols-3 gap-4 mb-8" id="cards"></div>
   <h2 class="font-semibold mb-3">Leagues</h2>
   <div id="leagues" class="flex flex-wrap gap-2"></div>`, "Home");
 const leagues = await api("/admin/leagues");
 document.getElementById("leagues").innerHTML = leagues.map(l =>
   `<a href="/standings.html?league=${l.id}" class="px-4 py-2 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-200 hover:bg-emerald-100">${esc(l.name)}</a>`).join("");
 document.getElementById("cards").innerHTML = [
-  ["/calendar.html","Match Calendar","View matches — click one to enter scores"],
   ["/standings.html","Standings","Live rankings by league"],
   ["/players.html","Player Search","History and stats"],
-  user ? ["/calendar.html","Enter Results","Log in → Calendar → match → Enter Scores"] : ["/login.html","Captain Login","Required to enter lineups and scores"],
+  ["/calendar.html","Calendar","Optional — view upcoming matches"],
 ].map(([h,t,d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400"><h2 class="font-semibold text-emerald-700">${t}</h2><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
-if (!user) {
-  document.getElementById("score-banner").innerHTML = `<div class="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-900">
-    To enter match results: <a href="/login.html" class="font-semibold text-emerald-700 underline">log in</a>, open the <a href="/calendar.html" class="underline">calendar</a>, click a match, then <strong>Enter Scores</strong>.
-  </div>`;
-}
 </script></body></html>

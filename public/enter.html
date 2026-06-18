@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc, alert } from "/js/ui.js";
+
+const user = await getUser();
+const loginUrl = `/login.html?next=${encodeURIComponent("/enter.html")}`;
+
+if (!user) {
+  page("Enter Results", `<div class="max-w-lg mx-auto mt-12 bg-white p-8 rounded-xl border text-center">
+    <h1 class="text-2xl font-bold mb-4">Enter Match Results</h1>
+    <p class="text-slate-600 mb-6">Log in to record match scores.</p>
+    <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
+  </div>`, "Enter Results");
+} else {
+  const [leagues, teams] = await Promise.all([api("/admin/leagues"), api("/admin/teams")]);
+  const today = new Date().toISOString().slice(0, 10);
+
+  page("Enter Results", `
+    <h1 class="text-2xl font-bold mb-2">Enter Match Results</h1>
+    <p class="text-slate-500 mb-6">Pick the teams and enter scores — no need to schedule ahead on the calendar.</p>
+    <div id="msg" hidden></div>
+    <div class="bg-white rounded-xl border p-5 mb-6">
+      <h2 class="font-semibold mb-4">Match</h2>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><label class="text-sm text-slate-500">League</label>
+          <select id="league" class="w-full border rounded-lg px-3 py-2 mt-1">${leagues.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></div>
+        <div><label class="text-sm text-slate-500">Date</label>
+          <input id="date" type="date" value="${today}" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+        <div><label class="text-sm text-slate-500">Home team</label>
+          <select id="home" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
+        <div><label class="text-sm text-slate-500">Away team</label>
+          <select id="away" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
+      </div>
+      <button id="start" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Continue to Scores</button>
+    </div>
+    <div id="scores" class="hidden"></div>`, "Enter Results");
+
+  const leagueEl = document.getElementById("league");
+  const homeEl = document.getElementById("home");
+  const awayEl = document.getElementById("away");
+
+  function teamOpts(leagueId, selected) {
+    const ts = teams.filter(t => t.league_id === leagueId);
+    return ts.map(t => `<option value="${t.id}" ${t.id === selected ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+  }
+
+  function refreshTeams() {
+    const lid = Number(leagueEl.value);
+    const ts = teams.filter(t => t.league_id === lid);
+    homeEl.innerHTML = teamOpts(lid, ts[0]?.id);
+    awayEl.innerHTML = teamOpts(lid, ts[1]?.id ?? ts[0]?.id);
+  }
+
+  leagueEl.onchange = refreshTeams;
+  refreshTeams();
+
+  const setInputs = (line, r, n) => `<div class="grid grid-cols-4 gap-2 text-sm items-center"><span>Set ${n}</span>
+    <input name="h${n}_${line.id}" type="number" min="0" max="7" value="${r?.["home_set"+n]??0}" class="border rounded px-2 py-1" required>
+    <input name="a${n}_${line.id}" type="number" min="0" max="7" value="${r?.["away_set"+n]??0}" class="border rounded px-2 py-1" required>
+    <div class="flex gap-1"><input name="htb${n}_${line.id}" placeholder="TB" value="${r?.["home_tb"+n]??""}" class="border rounded px-1 py-1 w-12 text-xs">
+    <input name="atb${n}_${line.id}" placeholder="TB" value="${r?.["away_tb"+n]??""}" class="border rounded px-1 py-1 w-12 text-xs"></div></div>`;
+
+  document.getElementById("start").onclick = async () => {
+    const homeId = Number(homeEl.value), awayId = Number(awayEl.value);
+    if (!homeId || !awayId) return alert(document.getElementById("msg"), "Select both teams");
+    if (homeId === awayId) return alert(document.getElementById("msg"), "Home and away teams must differ");
+    try {
+      const match = await api("/matches", { method: "POST", body: JSON.stringify({
+        league_id: Number(leagueEl.value), home_team_id: homeId, away_team_id: awayId,
+        match_date: document.getElementById("date").value,
+      })});
+      const data = await api("/matches/" + match.id);
+      const m = data.match;
+      const scoresEl = document.getElementById("scores");
+      scoresEl.classList.remove("hidden");
+      scoresEl.innerHTML = `
+        <h2 class="font-semibold mb-2">${esc(m.home_name)} vs ${esc(m.away_name)}</h2>
+        <p class="text-sm text-slate-500 mb-4">${m.match_date}</p>
+        <form id="form" class="space-y-4">${data.lineData.map(({line, result:r}) =>
+          `<div class="bg-white p-4 rounded-xl border"><h3 class="font-semibold mb-3">${esc(line.name)}</h3>
+          ${setInputs(line,r,1)}${setInputs(line,r,2)}<div class="grid grid-cols-4 gap-2 text-sm items-center mt-2"><span>Set 3</span>
+          <input name="h3_${line.id}" type="number" min="0" max="7" value="${r?.home_set3??""}" class="border rounded px-2 py-1" placeholder="—">
+          <input name="a3_${line.id}" type="number" min="0" max="7" value="${r?.away_set3??""}" class="border rounded px-2 py-1" placeholder="—">
+          <div class="flex gap-1"><input name="htb3_${line.id}" placeholder="TB" value="${r?.home_tb3??""}" class="border rounded px-1 py-1 w-12 text-xs">
+          <input name="atb3_${line.id}" placeholder="TB" value="${r?.away_tb3??""}" class="border rounded px-1 py-1 w-12 text-xs"></div></div></div>`
+        ).join("")}</form>
+        <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Results</button>
+        <a href="/standings.html?league=${m.league_id}" class="ml-3 text-emerald-700 underline text-sm">View standings →</a>`;
+      scoresEl.scrollIntoView({ behavior: "smooth" });
+      document.getElementById("form").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const scoreList = data.lineData.map(({line}) => ({
+          match_line_id: line.id,
+          home_set1:+fd.get("h1_"+line.id), away_set1:+fd.get("a1_"+line.id), home_tb1:fd.get("htb1_"+line.id)||undefined, away_tb1:fd.get("atb1_"+line.id)||undefined,
+          home_set2:+fd.get("h2_"+line.id), away_set2:+fd.get("a2_"+line.id), home_tb2:fd.get("htb2_"+line.id)||undefined, away_tb2:fd.get("atb2_"+line.id)||undefined,
+          home_set3:fd.get("h3_"+line.id)||undefined, away_set3:fd.get("a3_"+line.id)||undefined, home_tb3:fd.get("htb3_"+line.id)||undefined, away_tb3:fd.get("atb3_"+line.id)||undefined,
+        }));
+        try {
+          await api("/matches/"+match.id+"/scores", { method: "PUT", body: JSON.stringify({ scores: scoreList }) });
+          location.href = "/match.html?id=" + match.id;
+        } catch (err) { alert(document.getElementById("msg"), err.message); }
+      };
+    } catch (err) { alert(document.getElementById("msg"), err.message); }
+  };
+}
+</script></body></html>

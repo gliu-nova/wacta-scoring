@@ -8,25 +8,18 @@ const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
 const m = data.match;
 const loginUrl = `/login.html?next=${encodeURIComponent("/scores.html?id=" + id)}`;
 
-if (!user || !data.can_edit) {
+if (!user) {
   page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
   <div class="mt-8 bg-amber-50 border border-amber-200 p-6 rounded-xl text-center">
-    <p class="mb-4">You must log in as admin or team captain to enter scores.</p>
+    <p class="mb-4">Log in to enter or edit scores.</p>
     <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
-  </div>`, "Calendar");
-} else if (!data.can_score) {
-  page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
-  <div class="mt-8 bg-slate-100 border p-6 rounded-xl text-center">
-    <h1 class="text-xl font-bold mb-2">Scores not yet available</h1>
-    <p class="text-slate-600">Score entry opens on <strong>${m.match_date}</strong> for ${esc(m.home_name)} vs ${esc(m.away_name)}.</p>
-    <a href="/lineup.html?id=${id}" class="inline-block mt-4 text-emerald-700 underline">Set lineup instead</a>
-  </div>`, "Calendar");
+  </div>`, "Enter Results");
 } else {
   page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
   <h1 class="text-2xl font-bold my-2">Enter Scores</h1>
   <p class="text-slate-500 mb-4">${esc(m.home_name)} vs ${esc(m.away_name)} · ${m.match_date}</p>
   <div id="msg" hidden></div><form id="form" class="space-y-4"></form>
-  <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Scores</button>`, "Calendar");
+  <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Scores</button>`, "Enter Results");
   const setInputs = (line, r, n) => `<div class="grid grid-cols-4 gap-2 text-sm items-center"><span>Set ${n}</span>
     <input name="h${n}_${line.id}" type="number" min="0" max="7" value="${r?.["home_set"+n]??0}" class="border rounded px-2 py-1" required>
     <input name="a${n}_${line.id}" type="number" min="0" max="7" value="${r?.["away_set"+n]??0}" class="border rounded px-2 py-1" required>
