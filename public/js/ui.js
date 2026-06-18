@@ -20,12 +20,10 @@ export function esc(s) {
 
 export function nav(user, active = "", pendingCount = 0) {
   const links = [
-    ["Home", "/"], ["Enter Match Results", "/enter.html"], ["Standings", "/standings.html"], ["Players", "/players.html"],
+    ["Home", "/"], ["Enter Match Results", "/enter.html"], ["Standings", "/standings.html"],
+    ["Past Match Results", "/past-results.html"], ["Players", "/players.html"],
   ];
-  if (user) {
-    links.splice(3, 0, ["Calendar", "/calendar.html"]);
-    links.splice(4, 0, ["Approvals", "/approvals.html", pendingCount]);
-  }
+  if (user) links.push(["Approvals", "/approvals.html", pendingCount]);
   if (user?.role === "admin") links.push(["Admin", "/admin.html"]);
   return `<header class="bg-emerald-700 text-white shadow-lg sticky top-0 z-50">
     <div class="max-w-5xl mx-auto px-4 py-3">

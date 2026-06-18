@@ -26,7 +26,7 @@ page("WACTA Scoring", `
 document.getElementById("cards").innerHTML = [
   ["/standings.html", "Standings", "Full standings with export"],
   ["/players.html", "Player Search", "History and stats"],
-  ["/calendar.html", "Calendar", "View upcoming matches"],
+  ["/past-results.html", "Past Match Results", "Browse all previous matches and scores"],
 ].map(([h, t, d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400">
   <h3 class="font-semibold text-emerald-700">${t}</h3><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
 

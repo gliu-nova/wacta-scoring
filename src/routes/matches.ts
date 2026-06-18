@@ -17,17 +17,19 @@ import type { Env, Lineup, LineResult, LineWinner, Match, MatchLine, Player } fr
 
 const matches = new Hono<{ Bindings: Env }>();
 
-matches.get("/calendar", async (c) => {
-  const year = Number(c.req.query("year")) || new Date().getFullYear();
-  const month = Number(c.req.query("month")) || new Date().getMonth() + 1;
+matches.get("/history", async (c) => {
   const leagueId = c.req.query("league_id");
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${String(month).padStart(2, "0")}-${endDay}`;
-  let sql = "SELECT m.*, ht.name as home_name, at.name as away_name FROM matches m JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.match_date BETWEEN ? AND ?";
-  const binds: (string | number)[] = [start, end];
-  if (leagueId) { sql += " AND m.league_id = ?"; binds.push(Number(leagueId)); }
-  sql += " ORDER BY m.match_date";
+  let sql = `SELECT m.id, m.match_date, m.status, l.name as league_name,
+    ht.name as home_name, at.name as away_name,
+    (SELECT COUNT(*) FROM match_lines ml JOIN line_results lr ON lr.match_line_id = ml.id WHERE ml.match_id = m.id) as lines_scored,
+    (SELECT COUNT(*) FROM match_lines WHERE match_id = m.id) as total_lines
+    FROM matches m
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN leagues l ON l.id = m.league_id`;
+  const binds: number[] = [];
+  if (leagueId) { sql += " WHERE m.league_id = ?"; binds.push(Number(leagueId)); }
+  sql += " ORDER BY m.match_date DESC, m.id DESC";
   const rows = await c.env.DB.prepare(sql).bind(...binds).all();
   return c.json(rows.results ?? []);
 });

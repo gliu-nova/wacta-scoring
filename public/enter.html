@@ -11,7 +11,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 page("Enter Match Results", `
   <h1 class="text-2xl font-bold mb-2">Enter Match Results</h1>
-  <p class="text-slate-500 mb-6">Pick the teams and enter scores — no need to schedule ahead on the calendar.</p>
+  <p class="text-slate-500 mb-6">Pick the teams and enter scores for any match.</p>
   ${user ? "" : `<div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
     Your submission will be reviewed before it appears in standings. Logged-in users can publish results immediately.
   </div>`}
