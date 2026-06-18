@@ -21,7 +21,7 @@ export function esc(s) {
 export function nav(user, active = "", pendingCount = 0) {
   const links = [
     ["Home", "/"], ["Enter Match Results", "/enter.html"], ["Standings", "/standings.html"],
-    ["Past Match Results", "/past-results.html"], ["Players", "/players.html"],
+    ["Past Match Results", "/past-results.html"],
   ];
   if (user) links.push(["Approvals", "/approvals.html", pendingCount]);
   if (user?.role === "admin") links.push(["Admin", "/admin.html"]);

@@ -11,7 +11,6 @@ page("Standings", `<div class="flex flex-wrap justify-between gap-3 mb-4">
   <h1 class="text-2xl font-bold">Standings</h1>
   <div class="flex flex-wrap gap-2">
     <button id="export-standings" class="px-3 py-2 bg-amber-600 text-white rounded-lg text-sm">Export Standings</button>
-    <button id="export-matches" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm">Export Match Results</button>
     <a href="/export.html" class="px-3 py-2 border rounded-lg text-sm hover:bg-white" title="Opens setup instructions on this site — not Google Sheets directly">Google Sheets setup</a>
   </div>
 </div>
@@ -28,5 +27,4 @@ document.getElementById("tables").innerHTML = sections.map(({ league, standings 
 document.getElementById("export-standings").onclick = () => {
   for (const lg of leagues) downloadCsv(`/export/standings.csv?league_id=${lg.id}`);
 };
-document.getElementById("export-matches").onclick = () => downloadCsv("/export/matches.csv");
 </script></body></html>
