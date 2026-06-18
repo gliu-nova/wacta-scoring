@@ -24,9 +24,19 @@ function lineWinnerLabel(winner: string, homeName: string, awayName: string): st
   return "";
 }
 
-function lineGameScore(r: LineResult): string {
-  const [homeGames, awayGames] = countGames(r, "home");
-  return `${homeGames}-${awayGames}`;
+function formatLineScore(r: LineResult): string {
+  const set = (h: number, a: number, htb: number | null, atb: number | null) => {
+    if (h === 6 && a === 6 && htb != null && atb != null) return `${htb}-${atb}`;
+    return `${h}-${a}`;
+  };
+  const parts = [
+    set(r.home_set1, r.away_set1, r.home_tb1, r.away_tb1),
+    set(r.home_set2, r.away_set2, r.home_tb2, r.away_tb2),
+  ];
+  if (r.home_set3 != null && r.away_set3 != null) {
+    parts.push(set(r.home_set3, r.away_set3, r.home_tb3, r.away_tb3));
+  }
+  return parts.join(" ");
 }
 
 function formatOverall(
@@ -153,7 +163,7 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
       const result = resultsByOrder.get(col.sort_order);
       if (result) {
         row.push(lineWinnerLabel(result.winner, match.home_name, match.away_name));
-        row.push(lineGameScore(result));
+        row.push(formatLineScore(result));
       } else {
         row.push("", "");
       }
