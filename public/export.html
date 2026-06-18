@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50">
+<p class="p-6 text-slate-500">Loading export page…</p>
 <script type="module">
 import { api, getUser, page, esc, downloadCsv } from "/js/ui.js";
 
-const user = await getUser();
 const base = location.origin + "/api/export";
 
 page("Export Data", `<h1 class="text-2xl font-bold mb-2">Export Data</h1>
-<p class="text-slate-500 mb-8">Download CSV files or sync to Google Sheets manually (only updates when you click refresh in Sheets).</p>
+<p class="text-slate-500 mb-8">Download CSV files here. The Google Sheets link on Standings opens <strong>this page</strong> — it does not open Google Sheets directly.</p>
 <div id="err" hidden class="mb-4 p-3 bg-red-100 text-red-800 rounded-lg text-sm"></div>
 
 <h2 class="text-lg font-semibold mb-3">Download CSV</h2>
@@ -26,9 +26,9 @@ page("Export Data", `<h1 class="text-2xl font-bold mb-2">Export Data</h1>
 
 <h2 class="text-lg font-semibold mb-3">Google Sheets setup (manual refresh)</h2>
 <div class="bg-white rounded-xl border p-5 mb-4 text-sm text-slate-700 space-y-4">
-  <p>Your spreadsheet does <strong>not</strong> auto-update. It only refreshes when you click a button inside Google Sheets. If this website goes offline, your sheet keeps its last saved data.</p>
+  <p class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-900">Copy the script in the box below, then paste it into <strong>your Google Sheet → Extensions → Apps Script</strong>. Your sheet only updates when you click a refresh button inside Google Sheets.</p>
   <ol class="list-decimal list-inside space-y-2 text-slate-600">
-    <li>Open your Google Sheet</li>
+    <li>Open your Google Sheet (sheets.google.com)</li>
     <li>Go to <strong>Extensions → Apps Script</strong></li>
     <li>Delete any code there, paste the script from the box below, and click <strong>Save</strong></li>
     <li>Click <strong>Run</strong> on <code class="bg-slate-100 px-1 rounded">refreshWactaData</code> once (approve permissions when asked)</li>
@@ -42,8 +42,9 @@ page("Export Data", `<h1 class="text-2xl font-bold mb-2">Export Data</h1>
 </div>
 
 <h2 class="text-lg font-semibold mb-3">Public CSV URLs</h2>
-<div class="bg-white rounded-xl border p-5 text-sm space-y-2" id="urls"></div>`, user?.role === "admin" ? "Admin" : "Standings");
+<div class="bg-white rounded-xl border p-5 text-sm space-y-2" id="urls"></div>`, "Standings");
 
+const user = await getUser();
 if (user?.role === "admin") document.getElementById("dl-all").classList.remove("hidden");
 
 let leagues = [];
@@ -96,7 +97,7 @@ function writeCsv(sheet, csv) {
   if (rows.length) sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 }`;
 
-document.getElementById("script").value = leagues.length ? script : "// Could not load divisions — open export.html on the website to get the full script.";
+document.getElementById("script").value = leagues.length ? script : "// Could not load divisions — refresh this page to get the full script.";
 document.getElementById("copy-script").onclick = async () => {
   try {
     await navigator.clipboard.writeText(document.getElementById("script").value);
