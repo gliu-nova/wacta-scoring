@@ -2,10 +2,18 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
-import { api, page, esc, alert } from "/js/ui.js";
+import { api, getUser, page, esc, alert } from "/js/ui.js";
 const id = new URLSearchParams(location.search).get("id");
-const data = await api("/matches/"+id);
+const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
 const m = data.match;
+const loginUrl = `/login.html?next=${encodeURIComponent("/lineup.html?id=" + id)}`;
+if (!user || !data.can_edit) {
+  page("Lineup", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
+  <div class="mt-8 bg-amber-50 border border-amber-200 p-6 rounded-xl text-center">
+    <p class="mb-4">You must log in as admin or team captain to set lineups.</p>
+    <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
+  </div>`, "Calendar");
+} else {
 const [homeP, awayP] = await Promise.all([
   api("/admin/players").then(ps => ps.filter(p => p.team_id === m.home_team_id)),
   api("/admin/players").then(ps => ps.filter(p => p.team_id === m.away_team_id)),
@@ -39,4 +47,5 @@ document.getElementById("form").onsubmit = async (e) => {
     else location.href="/match.html?id="+id;
   } catch(err) { alert(document.getElementById("msg"), err.message); }
 };
+}
 </script></body></html>

@@ -21,7 +21,8 @@ document.getElementById("form").onsubmit = async (e) => {
   const fd = new FormData(e.target);
   try {
     const u = await api("/auth/login", { method: "POST", body: JSON.stringify({ username: fd.get("username"), password: fd.get("password") }) });
-    location.href = u.role === "admin" ? "/admin.html" : "/calendar.html";
+    const next = new URLSearchParams(location.search).get("next");
+    location.href = next || (u.role === "admin" ? "/admin.html" : "/calendar.html");
   } catch (err) { alert(document.getElementById("msg"), err.message); }
 };
 </script></body></html>

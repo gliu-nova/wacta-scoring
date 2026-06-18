@@ -26,7 +26,11 @@ async function load() {
   for (let i=0;i<6;i++) { html+='<div class="grid grid-cols-7 border-t min-h-[80px]">';
     for (let j=0;j<7;j++) { const cell = i===0&&j<first||d>days ? "" : String(d++);
       const ms = cell ? (byDate[parseInt(cell,10)]||[]) : [];
-      html+=`<div class="p-1 border-r text-xs">${cell?`<div class="text-slate-400 mb-1">${cell}</div>`:""}${ms.map(m=>`<a href="/match.html?id=${m.id}" class="block p-1 mb-1 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 truncate">${esc(m.home_name)} v ${esc(m.away_name)}</a>`).join("")}</div>`; }
+      html+=`<div class="p-1 border-r text-xs">${cell?`<div class="text-slate-400 mb-1">${cell}</div>`:""}${ms.map(m=>{
+        const today = new Date().toISOString().slice(0,10) >= m.match_date;
+        const actions = user ? `<div class="flex gap-1 mt-0.5"><a href="/lineup.html?id=${m.id}" class="text-[10px] text-blue-700 hover:underline">Lineup</a>${today?`<a href="/scores.html?id=${m.id}" class="text-[10px] text-emerald-700 font-medium hover:underline">Scores</a>`:""}</div>` : "";
+        return `<a href="/match.html?id=${m.id}" class="block p-1 mb-1 rounded bg-emerald-50 text-emerald-800 border border-emerald-200"><span class="truncate block">${esc(m.home_name)} v ${esc(m.away_name)}</span>${actions}</a>`;
+      }).join("")}</div>`; }
     html+='</div>'; if(d>days) break; }
   document.getElementById("cal").innerHTML = html+'</div>';
 }
