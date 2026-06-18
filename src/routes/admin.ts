@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getUser, hashPassword } from "../auth";
 import { logActivity } from "../services/activity";
+import { getPendingCount } from "../services/pending";
 import type { Env, League, LeagueLineTemplate, Player, Team, User } from "../types";
 
 const admin = new Hono<{ Bindings: Env }>();
@@ -19,6 +20,7 @@ admin.get("/stats", async (c) => {
     teams: await count("SELECT COUNT(*) as n FROM teams"),
     players: await count("SELECT COUNT(*) as n FROM players"),
     matches: await count("SELECT COUNT(*) as n FROM matches"),
+    pending: await getPendingCount(c.env.DB),
   });
 });
 

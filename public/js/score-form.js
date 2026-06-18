@@ -55,6 +55,10 @@ function num(fd, key) {
   return v === "" || v == null ? undefined : +v;
 }
 
+export function templatesToLineData(templates) {
+  return templates.map((t) => ({ line: { id: t.id, name: t.name }, result: null, lineup: null }));
+}
+
 export function parseScoresForm(fd, lineData) {
   return lineData.map(({ line }) => ({
     match_line_id: line.id,
@@ -73,5 +77,12 @@ export function parseScoresForm(fd, lineData) {
     away_tb3: fd.get("atb3_" + line.id) || undefined,
     home_players_text: fd.get("home_players_" + line.id) || undefined,
     away_players_text: fd.get("away_players_" + line.id) || undefined,
+  }));
+}
+
+export function parseGuestScoresForm(fd, lineData) {
+  return parseScoresForm(fd, lineData).map(({ match_line_id, ...rest }) => ({
+    line_template_id: match_line_id,
+    ...rest,
   }));
 }

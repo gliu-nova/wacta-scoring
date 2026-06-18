@@ -18,18 +18,21 @@ export function esc(s) {
   return d.innerHTML;
 }
 
-export function nav(user, active = "") {
+export function nav(user, active = "", pendingCount = 0) {
   const links = [
     ["Home", "/"], ["Enter Match Results", "/enter.html"], ["Standings", "/standings.html"], ["Players", "/players.html"],
   ];
-  if (user) links.splice(3, 0, ["Calendar", "/calendar.html"]);
+  if (user) {
+    links.splice(3, 0, ["Calendar", "/calendar.html"]);
+    links.splice(4, 0, ["Approvals", "/approvals.html", pendingCount]);
+  }
   if (user?.role === "admin") links.push(["Admin", "/admin.html"]);
   return `<header class="bg-emerald-700 text-white shadow-lg sticky top-0 z-50">
     <div class="max-w-5xl mx-auto px-4 py-3">
       <div class="flex flex-wrap justify-between items-center gap-2">
         <a href="/" class="font-bold text-lg">🎾 WACTA Scoring</a>
         <div class="flex flex-wrap gap-3 text-sm items-center">
-          ${links.map(([l, h]) => `<a href="${h}" class="hover:text-emerald-200 ${active === l ? "underline" : ""}">${l}</a>`).join("")}
+          ${links.map(([l, h, badge]) => `<a href="${h}" class="hover:text-emerald-200 ${active === l ? "underline" : ""}">${l}${badge ? ` (${badge})` : ""}</a>`).join("")}
           ${user ? `<span class="text-emerald-200">${esc(user.username)}</span><button id="logout-btn" class="hover:text-emerald-200">Logout</button>` : `<a href="/login.html" class="bg-emerald-600 px-3 py-1 rounded">Login</a>`}
         </div>
       </div>
@@ -40,8 +43,15 @@ export function nav(user, active = "") {
 export function page(title, body, active = "") {
   document.title = title + " — WACTA";
   document.body.innerHTML = `<div id="nav"></div><main class="max-w-5xl mx-auto px-4 py-6" id="main">${body}</main>`;
-  getUser().then((user) => {
-    document.getElementById("nav").innerHTML = nav(user, active);
+  getUser().then(async (user) => {
+    let pendingCount = 0;
+    if (user) {
+      try {
+        const { count } = await api("/matches/pending/count");
+        pendingCount = count;
+      } catch { /* ignore */ }
+    }
+    document.getElementById("nav").innerHTML = nav(user, active, pendingCount);
     document.getElementById("logout-btn")?.addEventListener("click", async () => {
       await api("/auth/logout", { method: "POST" });
       location.href = "/";

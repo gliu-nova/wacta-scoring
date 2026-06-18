@@ -3,90 +3,116 @@
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
 import { api, getUser, page, esc, alert } from "/js/ui.js";
-import { renderLineCards, parseScoresForm } from "/js/score-form.js";
+import { renderLineCards, parseScoresForm, parseGuestScoresForm, templatesToLineData } from "/js/score-form.js";
 
 const user = await getUser();
-const loginUrl = `/login.html?next=${encodeURIComponent("/enter.html")}`;
+const [leagues, teams] = await Promise.all([api("/admin/leagues"), api("/admin/teams")]);
+const today = new Date().toISOString().slice(0, 10);
 
-if (!user) {
-  page("Enter Match Results", `<div class="max-w-lg mx-auto mt-12 bg-white p-8 rounded-xl border text-center">
-    <h1 class="text-2xl font-bold mb-4">Enter Match Results</h1>
-    <p class="text-slate-600 mb-6">Log in to record match scores.</p>
-    <a href="${loginUrl}" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-lg">Log In</a>
-  </div>`, "Enter Match Results");
-} else {
-  const [leagues, teams] = await Promise.all([api("/admin/leagues"), api("/admin/teams")]);
-  const today = new Date().toISOString().slice(0, 10);
-
-  page("Enter Match Results", `
-    <h1 class="text-2xl font-bold mb-2">Enter Match Results</h1>
-    <p class="text-slate-500 mb-6">Pick the teams and enter scores — no need to schedule ahead on the calendar.</p>
-    <div id="msg" hidden></div>
-    <div class="bg-white rounded-xl border p-5 mb-6">
-      <h2 class="font-semibold mb-4">Match</h2>
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div><label class="text-sm text-slate-500">League</label>
-          <select id="league" class="w-full border rounded-lg px-3 py-2 mt-1">${leagues.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></div>
-        <div><label class="text-sm text-slate-500">Date</label>
-          <input id="date" type="date" value="${today}" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
-        <div><label class="text-sm text-slate-500">Home team</label>
-          <select id="home" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
-        <div><label class="text-sm text-slate-500">Away team</label>
-          <select id="away" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
-      </div>
-      <p class="text-sm text-slate-500 mt-4">Next step: pick the result for each line — win or tie (scores and player names optional).</p>
-      <button id="start" class="mt-2 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Continue to Scores</button>
+page("Enter Match Results", `
+  <h1 class="text-2xl font-bold mb-2">Enter Match Results</h1>
+  <p class="text-slate-500 mb-6">Pick the teams and enter scores — no need to schedule ahead on the calendar.</p>
+  ${user ? "" : `<div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+    Your submission will be reviewed before it appears in standings. Logged-in users can publish results immediately.
+  </div>`}
+  <div id="msg" hidden></div>
+  <div class="bg-white rounded-xl border p-5 mb-6">
+    <h2 class="font-semibold mb-4">Match</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="text-sm text-slate-500">League</label>
+        <select id="league" class="w-full border rounded-lg px-3 py-2 mt-1">${leagues.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></div>
+      <div><label class="text-sm text-slate-500">Date</label>
+        <input id="date" type="date" value="${today}" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+      <div><label class="text-sm text-slate-500">Home team</label>
+        <select id="home" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
+      <div><label class="text-sm text-slate-500">Away team</label>
+        <select id="away" class="w-full border rounded-lg px-3 py-2 mt-1"></select></div>
     </div>
-    <div id="scores" class="hidden"></div>`, "Enter Match Results");
+    <p class="text-sm text-slate-500 mt-4">Next step: pick the result for each line — win or tie (scores and player names optional).</p>
+    <button id="start" class="mt-2 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Continue to Scores</button>
+  </div>
+  <div id="scores" class="hidden"></div>`, "Enter Match Results");
 
-  const leagueEl = document.getElementById("league");
-  const homeEl = document.getElementById("home");
-  const awayEl = document.getElementById("away");
+const leagueEl = document.getElementById("league");
+const homeEl = document.getElementById("home");
+const awayEl = document.getElementById("away");
 
-  function teamOpts(leagueId, selected) {
-    const ts = teams.filter(t => t.league_id === leagueId);
-    return ts.map(t => `<option value="${t.id}" ${t.id === selected ? "selected" : ""}>${esc(t.name)}</option>`).join("");
-  }
+function teamOpts(leagueId, selected) {
+  const ts = teams.filter(t => t.league_id === leagueId);
+  return ts.map(t => `<option value="${t.id}" ${t.id === selected ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+}
 
-  function refreshTeams() {
-    const lid = Number(leagueEl.value);
-    const ts = teams.filter(t => t.league_id === lid);
-    homeEl.innerHTML = teamOpts(lid, ts[0]?.id);
-    awayEl.innerHTML = teamOpts(lid, ts[1]?.id ?? ts[0]?.id);
-  }
+function refreshTeams() {
+  const lid = Number(leagueEl.value);
+  const ts = teams.filter(t => t.league_id === lid);
+  homeEl.innerHTML = teamOpts(lid, ts[0]?.id);
+  awayEl.innerHTML = teamOpts(lid, ts[1]?.id ?? ts[0]?.id);
+}
 
-  leagueEl.onchange = refreshTeams;
-  refreshTeams();
+leagueEl.onchange = refreshTeams;
+refreshTeams();
 
-  document.getElementById("start").onclick = async () => {
-    const homeId = Number(homeEl.value), awayId = Number(awayEl.value);
-    if (!homeId || !awayId) return alert(document.getElementById("msg"), "Select both teams");
-    if (homeId === awayId) return alert(document.getElementById("msg"), "Home and away teams must differ");
-    try {
+function homeAwayNames() {
+  const homeId = Number(homeEl.value), awayId = Number(awayEl.value);
+  return {
+    home: teams.find(t => t.id === homeId)?.name ?? "Home",
+    away: teams.find(t => t.id === awayId)?.name ?? "Away",
+  };
+}
+
+document.getElementById("start").onclick = async () => {
+  const homeId = Number(homeEl.value), awayId = Number(awayEl.value);
+  if (!homeId || !awayId) return alert(document.getElementById("msg"), "Select both teams");
+  if (homeId === awayId) return alert(document.getElementById("msg"), "Home and away teams must differ");
+  const msgEl = document.getElementById("msg");
+  const scoresEl = document.getElementById("scores");
+  const { home, away } = homeAwayNames();
+  const matchDate = document.getElementById("date").value;
+  const leagueId = Number(leagueEl.value);
+
+  try {
+    if (user) {
       const match = await api("/matches", { method: "POST", body: JSON.stringify({
-        league_id: Number(leagueEl.value), home_team_id: homeId, away_team_id: awayId,
-        match_date: document.getElementById("date").value,
+        league_id: leagueId, home_team_id: homeId, away_team_id: awayId, match_date: matchDate,
       })});
       const data = await api("/matches/" + match.id);
-      const m = data.match;
-      const scoresEl = document.getElementById("scores");
-      scoresEl.classList.remove("hidden");
-      scoresEl.innerHTML = `
-        <h2 class="font-semibold mb-2">${esc(m.home_name)} vs ${esc(m.away_name)}</h2>
-        <p class="text-sm text-slate-500 mb-4">${m.match_date}</p>
-        <form id="form" class="space-y-4">${renderLineCards(data.lineData, m.home_name, m.away_name)}</form>
-        <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Results</button>
-        <a href="/standings.html?league=${m.league_id}" class="ml-3 text-emerald-700 underline text-sm">View standings →</a>`;
-      scoresEl.scrollIntoView({ behavior: "smooth" });
-      document.getElementById("form").onsubmit = async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const scoreList = parseScoresForm(fd, data.lineData);
-        try {
-          await api("/matches/"+match.id+"/scores", { method: "PUT", body: JSON.stringify({ scores: scoreList }) });
-          location.href = "/match.html?id=" + match.id;
-        } catch (err) { alert(document.getElementById("msg"), err.message); }
-      };
+      showScoreForm(scoresEl, data.lineData, home, away, matchDate, async (scoreList) => {
+        await api("/matches/" + match.id + "/scores", { method: "PUT", body: JSON.stringify({ scores: scoreList }) });
+        location.href = "/match.html?id=" + match.id;
+      });
+    } else {
+      const templates = await api("/admin/leagues/" + leagueId + "/lines");
+      const lineData = templatesToLineData(templates);
+      showScoreForm(scoresEl, lineData, home, away, matchDate, async (scoreList) => {
+        await api("/matches/submit", { method: "POST", body: JSON.stringify({
+          league_id: leagueId, home_team_id: homeId, away_team_id: awayId, match_date: matchDate, scores: scoreList,
+        })});
+        scoresEl.innerHTML = `<div class="bg-emerald-50 border border-emerald-200 p-6 rounded-xl text-center">
+          <h2 class="text-lg font-semibold text-emerald-900 mb-2">Submitted for review</h2>
+          <p class="text-emerald-800 text-sm mb-4">Thanks! Your results will appear in standings once a league admin approves them.</p>
+          <a href="/" class="text-emerald-700 underline text-sm">Back to home</a>
+        </div>`;
+        scoresEl.scrollIntoView({ behavior: "smooth" });
+      }, true);
+    }
+  } catch (err) { alert(msgEl, err.message); }
+};
+
+function showScoreForm(scoresEl, lineData, homeName, awayName, matchDate, onSave, guest = false) {
+  scoresEl.classList.remove("hidden");
+  scoresEl.innerHTML = `
+    <h2 class="font-semibold mb-2">${esc(homeName)} vs ${esc(awayName)}</h2>
+    <p class="text-sm text-slate-500 mb-4">${matchDate}</p>
+    <form id="form" class="space-y-4">${renderLineCards(lineData, homeName, awayName)}</form>
+    <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">${guest ? "Submit for Review" : "Save Results"}</button>
+    ${guest ? "" : `<a href="/standings.html" class="ml-3 text-emerald-700 underline text-sm">View standings →</a>`}`;
+  scoresEl.scrollIntoView({ behavior: "smooth" });
+  document.getElementById("form").onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const scoreList = guest ? parseGuestScoresForm(fd, lineData) : parseScoresForm(fd, lineData);
+    try {
+      await onSave(scoreList);
     } catch (err) { alert(document.getElementById("msg"), err.message); }
   };
 }

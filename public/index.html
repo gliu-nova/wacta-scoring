@@ -13,9 +13,9 @@ const user = await getUser();
 page("WACTA Scoring", `
   <h1 class="text-2xl font-bold mb-2">Private Tennis League Scoring</h1>
   <p class="text-slate-600 mb-6">Record match results, view standings, and track players.</p>
-  <a href="${user ? "/enter.html" : "/login.html?next=%2Fenter.html"}" class="block mb-6 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
+  <a href="/enter.html" class="block mb-6 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
     <h2 class="text-xl font-bold">Enter Match Results</h2>
-    <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores" : "Log in to record scores"}</p>
+    <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores — publishes immediately" : "Submit scores for admin review before publishing"}</p>
   </a>
   <div class="grid sm:grid-cols-3 gap-4 mb-10" id="cards"></div>
   <h2 class="text-xl font-bold mb-4">Standings</h2>

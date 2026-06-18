@@ -9,7 +9,7 @@
     "dev": "wrangler pages dev public --d1=DB --local",
     "db:local": "wrangler d1 execute wacta-scoring --local --file=./migrations/0002_full_league.sql",
     "db:remote": "wrangler d1 execute wacta-scoring --remote --file=./migrations/0002_full_league.sql",
-    "db:migrate": "wrangler d1 execute wacta-scoring --remote --file=./migrations/0004_activity_log.sql",
+    "db:migrate": "wrangler d1 execute wacta-scoring --remote --file=./migrations/0005_pending_submissions.sql",
     "deploy": "wrangler pages deploy public"
   },
   "dependencies": {

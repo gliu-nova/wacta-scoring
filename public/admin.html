@@ -15,6 +15,7 @@ page("Admin", `
       `<div class="bg-white p-5 rounded-xl border"><div class="text-3xl font-bold text-emerald-600">${n}</div><div class="text-slate-500 text-sm">${l}</div></div>`).join("")}
   </div>
   <div class="flex flex-wrap gap-3 mb-8">
+    <a href="/approvals.html" class="px-4 py-2 bg-amber-600 text-white rounded-lg">Pending Approvals${stats.pending ? ` (${stats.pending})` : ""}</a>
     <a href="/leagues.html" class="px-4 py-2 bg-emerald-600 text-white rounded-lg">Leagues</a>
     <a href="/teams.html" class="px-4 py-2 bg-emerald-600 text-white rounded-lg">Teams</a>
     <a href="/players-admin.html" class="px-4 py-2 bg-emerald-600 text-white rounded-lg">Players</a>

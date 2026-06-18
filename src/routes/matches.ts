@@ -2,9 +2,17 @@ import { Hono } from "hono";
 import { getUser } from "../auth";
 import { logActivity } from "../services/activity";
 import { createMatchLines, updateMatchStatus } from "../services/matches";
-import { computeStandings } from "../services/standings";
-import { ratingWarnings, validateLineScoreEntry } from "../services/validation";
-import type { Env, Lineup, LineResult, LineWinner, Match, MatchLine, Player, User } from "../types";
+import {
+  approvePendingSubmission,
+  createPendingSubmission,
+  getPendingCount,
+  listPendingSubmissions,
+  rejectPendingSubmission,
+  type GuestScoreEntry,
+} from "../services/pending";
+import { applyScores } from "../services/scores";
+import { ratingWarnings } from "../services/validation";
+import type { Env, Lineup, LineResult, LineWinner, Match, MatchLine, Player } from "../types";
 
 const matches = new Hono<{ Bindings: Env }>();
 
@@ -40,6 +48,64 @@ matches.get("/recent", async (c) => {
     LIMIT ?`
   ).bind(limit).all();
   return c.json(rows.results ?? []);
+});
+
+matches.get("/pending", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  return c.json(await listPendingSubmissions(c.env.DB));
+});
+
+matches.get("/pending/count", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  return c.json({ count: await getPendingCount(c.env.DB) });
+});
+
+matches.post("/submit", async (c) => {
+  const b = await c.req.json<{
+    league_id?: number;
+    home_team_id?: number;
+    away_team_id?: number;
+    match_date?: string;
+    location?: string;
+    scores?: GuestScoreEntry[];
+  }>();
+  if (!b.league_id || !b.home_team_id || !b.away_team_id || !b.match_date || !b.scores?.length) {
+    return c.json({ error: "Missing required fields" }, 400);
+  }
+  const result = await createPendingSubmission(c.env.DB, {
+    league_id: b.league_id,
+    home_team_id: b.home_team_id,
+    away_team_id: b.away_team_id,
+    match_date: b.match_date,
+    location: b.location,
+    scores: b.scores,
+  });
+  if ("errors" in result) return c.json({ error: result.errors.join("; ") }, 400);
+  const info = await c.env.DB.prepare(
+    "SELECT ht.name as home_name, at.name as away_name FROM teams ht, teams at WHERE ht.id = ? AND at.id = ?"
+  ).bind(b.home_team_id, b.away_team_id).first<{ home_name: string; away_name: string }>();
+  if (info) {
+    await logActivity(c.env.DB, null, `Guest submitted match results: ${info.home_name} vs ${info.away_name} (pending approval)`, "/approvals.html");
+  }
+  return c.json({ ok: true, pending: true, id: result.id }, 201);
+});
+
+matches.post("/pending/:id/approve", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const result = await approvePendingSubmission(c.env.DB, Number(c.req.param("id")), user);
+  if ("error" in result) return c.json({ error: result.error }, result.error === "Not found" ? 404 : 400);
+  return c.json(result);
+});
+
+matches.post("/pending/:id/reject", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const result = await rejectPendingSubmission(c.env.DB, Number(c.req.param("id")), user);
+  if ("error" in result) return c.json({ error: result.error }, 404);
+  return c.json(result);
 });
 
 matches.get("/:id", async (c) => {
@@ -128,44 +194,8 @@ matches.put("/:id/scores", async (c) => {
     home_set3?: number; away_set3?: number; home_tb3?: number; away_tb3?: number;
     home_players_text?: string; away_players_text?: string;
   }> }>();
-  const errors: string[] = [];
-  for (const s of scores) {
-    const line = await c.env.DB.prepare("SELECT name FROM match_lines WHERE id = ?").bind(s.match_line_id).first<{ name: string }>();
-    const parsed = {
-      home_set1: s.home_set1 ?? 0, away_set1: s.away_set1 ?? 0, home_tb1: s.home_tb1 ?? null, away_tb1: s.away_tb1 ?? null,
-      home_set2: s.home_set2 ?? 0, away_set2: s.away_set2 ?? 0, home_tb2: s.home_tb2 ?? null, away_tb2: s.away_tb2 ?? null,
-      home_set3: s.home_set3 ?? null, away_set3: s.away_set3 ?? null, home_tb3: s.home_tb3 ?? null, away_tb3: s.away_tb3 ?? null,
-    };
-    const vr = validateLineScoreEntry(parsed, s.winner);
-    if (!vr.ok) { errors.push(...vr.errors.map((e) => `${line?.name}: ${e}`)); continue; }
-    const winner = s.winner;
-    const homeText = s.home_players_text?.trim() || null;
-    const awayText = s.away_players_text?.trim() || null;
-    if (homeText || awayText) {
-      const existingLu = await c.env.DB.prepare("SELECT id FROM lineups WHERE match_line_id = ?").bind(s.match_line_id).first();
-      if (existingLu) {
-        await c.env.DB.prepare("UPDATE lineups SET home_players_text=?, away_players_text=?, updated_at=datetime('now') WHERE match_line_id=?")
-          .bind(homeText, awayText, s.match_line_id).run();
-      } else {
-        await c.env.DB.prepare("INSERT INTO lineups (match_line_id, home_players_text, away_players_text) VALUES (?, ?, ?)")
-          .bind(s.match_line_id, homeText, awayText).run();
-      }
-    }
-    const existing = await c.env.DB.prepare("SELECT id FROM line_results WHERE match_line_id = ?").bind(s.match_line_id).first();
-    if (existing) {
-      await c.env.DB.prepare(`UPDATE line_results SET home_set1=?,away_set1=?,home_tb1=?,away_tb1=?,home_set2=?,away_set2=?,home_tb2=?,away_tb2=?,
-        home_set3=?,away_set3=?,home_tb3=?,away_tb3=?,winner=?,submitted_by_id=?,submitted_at=datetime('now') WHERE match_line_id=?`)
-        .bind(parsed.home_set1,parsed.away_set1,parsed.home_tb1,parsed.away_tb1,parsed.home_set2,parsed.away_set2,parsed.home_tb2,parsed.away_tb2,
-          parsed.home_set3,parsed.away_set3,parsed.home_tb3,parsed.away_tb3,winner,user.id,s.match_line_id).run();
-    } else {
-      await c.env.DB.prepare(`INSERT INTO line_results (match_line_id,home_set1,away_set1,home_tb1,away_tb1,home_set2,away_set2,home_tb2,away_tb2,home_set3,away_set3,home_tb3,away_tb3,winner,submitted_by_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .bind(s.match_line_id,parsed.home_set1,parsed.away_set1,parsed.home_tb1,parsed.away_tb1,parsed.home_set2,parsed.away_set2,parsed.home_tb2,parsed.away_tb2,
-          parsed.home_set3,parsed.away_set3,parsed.home_tb3,parsed.away_tb3,winner,user.id).run();
-    }
-  }
+  const errors = await applyScores(c.env.DB, matchId, scores, user.id);
   if (errors.length) return c.json({ error: errors.join("; ") }, 400);
-  await updateMatchStatus(c.env.DB, matchId);
   const info = await c.env.DB.prepare(
     `SELECT ht.name as home_name, at.name as away_name FROM matches m
      JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`

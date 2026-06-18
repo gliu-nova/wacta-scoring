@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50"><div id="app"></div>
+<script type="module">
+import { api, getUser, page, esc, alert } from "/js/ui.js";
+
+const user = await getUser();
+if (!user) location.href = `/login.html?next=${encodeURIComponent("/approvals.html")}`;
+
+page("Pending Approvals", `
+  <h1 class="text-2xl font-bold mb-2">Pending Approvals</h1>
+  <p class="text-slate-500 mb-6">Guest-submitted match results waiting for review before they publish to standings.</p>
+  <div id="msg" hidden></div>
+  <div id="list" class="space-y-6"></div>`, "Approvals");
+
+function fmtScore(s) {
+  const parts = [];
+  if (s.home_set1 != null || s.away_set1 != null) parts.push(`${s.home_set1 ?? 0}-${s.away_set1 ?? 0}`);
+  if (s.home_set2 != null || s.away_set2 != null) parts.push(`${s.home_set2 ?? 0}-${s.away_set2 ?? 0}`);
+  if (s.home_set3 != null || s.away_set3 != null) parts.push(`${s.home_set3}-${s.away_set3}`);
+  return parts.length ? parts.join(", ") : "—";
+}
+
+function winnerLabel(s, home, away) {
+  if (s.winner === "home") return `${home} W`;
+  if (s.winner === "away") return `${away} W`;
+  return "Tie";
+}
+
+function fmtWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
+  return d.toLocaleString();
+}
+
+async function load() {
+  const pending = await api("/matches/pending");
+  const list = document.getElementById("list");
+  if (!pending.length) {
+    list.innerHTML = `<p class="p-8 text-center text-slate-400 bg-white rounded-xl border">No pending submissions.</p>`;
+    return;
+  }
+  list.innerHTML = pending.map((p) => `
+    <div class="bg-white rounded-xl border overflow-hidden" data-id="${p.id}">
+      <div class="p-4 border-b bg-slate-50 flex flex-wrap justify-between gap-2">
+        <div>
+          <h2 class="font-semibold">${esc(p.home_name)} vs ${esc(p.away_name)}</h2>
+          <p class="text-sm text-slate-500">${esc(p.league_name)} · ${p.match_date} · submitted ${fmtWhen(p.submitted_at)}</p>
+        </div>
+        <div class="flex gap-2">
+          <button data-approve="${p.id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Approve & Publish</button>
+          <button data-reject="${p.id}" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm hover:bg-slate-300">Reject</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100"><tr>
+            <th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(p.home_name)}</th>
+            <th class="p-3 text-left">${esc(p.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th>
+          </tr></thead>
+          <tbody>${p.scores.map((s) => `<tr class="border-t">
+            <td class="p-3 font-medium">${esc(s.line_name)}</td>
+            <td class="p-3">${esc(s.home_players_text || "—")}</td>
+            <td class="p-3">${esc(s.away_players_text || "—")}</td>
+            <td class="p-3 font-mono">${fmtScore(s)}</td>
+            <td class="p-3">${esc(winnerLabel(s, p.home_name, p.away_name))}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>
+    </div>`).join("");
+
+  list.querySelectorAll("[data-approve]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Approve and publish these results to standings?")) return;
+      try {
+        const { match_id } = await api("/matches/pending/" + btn.dataset.approve + "/approve", { method: "POST" });
+        location.href = "/match.html?id=" + match_id;
+      } catch (err) { alert(document.getElementById("msg"), err.message); }
+    };
+  });
+  list.querySelectorAll("[data-reject]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Reject this submission? It will not be published.")) return;
+      try {
+        await api("/matches/pending/" + btn.dataset.reject + "/reject", { method: "POST" });
+        load();
+      } catch (err) { alert(document.getElementById("msg"), err.message); }
+    };
+  });
+}
+
+load();
+</script></body></html>

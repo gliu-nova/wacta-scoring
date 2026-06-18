@@ -43,6 +43,11 @@ const TABLES = [
   `CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, description TEXT NOT NULL, link TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+  `CREATE TABLE IF NOT EXISTS pending_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, league_id INTEGER NOT NULL, home_team_id INTEGER NOT NULL,
+    away_team_id INTEGER NOT NULL, match_date TEXT NOT NULL, location TEXT, scores_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    reviewed_by_id INTEGER, reviewed_at TEXT, match_id INTEGER)`,
 ];
 
 const ALTERS = [
