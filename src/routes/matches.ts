@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getUser } from "../auth";
+import { logActivity } from "../services/activity";
 import { createMatchLines, updateMatchStatus } from "../services/matches";
 import { computeStandings } from "../services/standings";
 import { ratingWarnings, validateLineScoreEntry } from "../services/validation";
@@ -71,6 +72,12 @@ matches.post("/", async (c) => {
   ).bind(b.league_id, b.home_team_id, b.away_team_id, b.match_date, b.location?.trim() || null).run();
   const match = await c.env.DB.prepare("SELECT * FROM matches WHERE id = ?").bind(r.meta.last_row_id).first<Match>();
   if (match) await createMatchLines(c.env.DB, match);
+  const info = await c.env.DB.prepare(
+    `SELECT ht.name as home_name, at.name as away_name, l.name as league_name
+     FROM matches m JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id
+     JOIN leagues l ON l.id=m.league_id WHERE m.id = ?`
+  ).bind(match?.id).first<{ home_name: string; away_name: string; league_name: string }>();
+  if (info) await logActivity(c.env.DB, user, `Created match ${info.home_name} vs ${info.away_name} (${info.league_name})`, `/match.html?id=${match?.id}`);
   return c.json(match, 201);
 });
 
@@ -99,6 +106,11 @@ matches.put("/:id/lineup", async (c) => {
     }
   }
   await updateMatchStatus(c.env.DB, matchId);
+  const info = await c.env.DB.prepare(
+    `SELECT ht.name as home_name, at.name as away_name FROM matches m
+     JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
+  ).bind(matchId).first<{ home_name: string; away_name: string }>();
+  if (info) await logActivity(c.env.DB, user, `Updated lineup for ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
   return c.json({ ok: true, warnings });
 });
 
@@ -154,6 +166,11 @@ matches.put("/:id/scores", async (c) => {
   }
   if (errors.length) return c.json({ error: errors.join("; ") }, 400);
   await updateMatchStatus(c.env.DB, matchId);
+  const info = await c.env.DB.prepare(
+    `SELECT ht.name as home_name, at.name as away_name FROM matches m
+     JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
+  ).bind(matchId).first<{ home_name: string; away_name: string }>();
+  if (info) await logActivity(c.env.DB, user, `Submitted scores for ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
   return c.json({ ok: true });
 });
 

@@ -13,20 +13,27 @@ const user = await getUser();
 page("WACTA Scoring", `
   <h1 class="text-2xl font-bold mb-2">Private Tennis League Scoring</h1>
   <p class="text-slate-600 mb-6">Record match results, view standings, and track players.</p>
-  <a href="${user ? "/enter.html" : "/login.html?next=%2Fenter.html"}" class="block mb-10 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
+  <a href="${user ? "/enter.html" : "/login.html?next=%2Fenter.html"}" class="block mb-6 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
     <h2 class="text-xl font-bold">Enter Match Results</h2>
     <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores" : "Log in to record scores"}</p>
   </a>
+  <div class="grid sm:grid-cols-3 gap-4 mb-10" id="cards"></div>
   <h2 class="text-xl font-bold mb-4">Standings</h2>
   <div id="standings" class="space-y-6 mb-10"></div>
-  <h2 class="text-xl font-bold mb-4">Recent Results</h2>
-  <div id="recent" class="bg-white rounded-xl border overflow-hidden"></div>
-  <div class="grid sm:grid-cols-3 gap-4 mt-10" id="cards"></div>`, "Home");
+  <h2 class="text-xl font-bold mb-4">Recent Changes</h2>
+  <div id="activity" class="bg-white rounded-xl border overflow-hidden"></div>`, "Home");
+
+document.getElementById("cards").innerHTML = [
+  ["/standings.html", "Standings", "Full standings with export"],
+  ["/players.html", "Player Search", "History and stats"],
+  ["/calendar.html", "Calendar", "View upcoming matches"],
+].map(([h, t, d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400">
+  <h3 class="font-semibold text-emerald-700">${t}</h3><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
 
 const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
-const [standingsSections, recent] = await Promise.all([
+const [standingsSections, activity] = await Promise.all([
   Promise.all(leagues.map(async (lg) => ({ league: lg, standings: await api("/standings/" + lg.id) }))),
-  api("/matches/recent?limit=12"),
+  api("/activity/recent?limit=15"),
 ]);
 
 document.getElementById("standings").innerHTML = standingsSections.map(({ league, standings }) =>
@@ -41,20 +48,16 @@ function fmtWhen(iso) {
   return d.toLocaleDateString();
 }
 
-document.getElementById("recent").innerHTML = recent.length
-  ? recent.map((m) => `<a href="/match.html?id=${m.id}" class="block p-4 border-b last:border-b-0 hover:bg-slate-50">
-      <div class="flex flex-wrap justify-between gap-2">
-        <span class="font-medium">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</span>
-        <span class="text-sm text-slate-500">${esc(m.match_date)}</span>
+document.getElementById("activity").innerHTML = activity.length
+  ? activity.map((a) => {
+      const inner = `<div class="flex flex-wrap justify-between gap-2">
+        <span>${esc(a.description)}</span>
+        <span class="text-sm text-slate-400 whitespace-nowrap">${fmtWhen(a.created_at)}</span>
       </div>
-      <div class="text-sm text-slate-500 mt-1">${esc(m.league_name)} · ${m.lines_scored} line${m.lines_scored === 1 ? "" : "s"} scored · Updated ${fmtWhen(m.updated_at)}</div>
-    </a>`).join("")
-  : `<p class="p-8 text-center text-slate-400">No results yet — be the first to enter a match!</p>`;
-
-document.getElementById("cards").innerHTML = [
-  ["/standings.html", "Full Standings", "Detailed view with export"],
-  ["/players.html", "Player Search", "History and stats"],
-  ["/calendar.html", "Calendar", "View upcoming matches"],
-].map(([h, t, d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400">
-  <h3 class="font-semibold text-emerald-700">${t}</h3><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
+      ${a.username ? `<div class="text-xs text-slate-400 mt-1">by ${esc(a.username)}</div>` : ""}`;
+      return a.link
+        ? `<a href="${esc(a.link)}" class="block p-4 border-b last:border-b-0 hover:bg-slate-50">${inner}</a>`
+        : `<div class="p-4 border-b last:border-b-0">${inner}</div>`;
+    }).join("")
+  : `<p class="p-8 text-center text-slate-400">No recent changes yet.</p>`;
 </script></body></html>

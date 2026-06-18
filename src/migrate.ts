@@ -40,6 +40,9 @@ const TABLES = [
     home_set2 INTEGER NOT NULL DEFAULT 0, away_set2 INTEGER NOT NULL DEFAULT 0, home_tb2 INTEGER, away_tb2 INTEGER,
     home_set3 INTEGER, away_set3 INTEGER, home_tb3 INTEGER, away_tb3 INTEGER,
     winner TEXT NOT NULL, submitted_by_id INTEGER, submitted_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+  `CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, description TEXT NOT NULL, link TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
 ];
 
 const ALTERS = [

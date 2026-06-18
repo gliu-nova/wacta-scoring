@@ -7,6 +7,7 @@ import matches from "./routes/matches";
 import players from "./routes/players";
 import standings from "./routes/standings";
 import exportRoutes from "./routes/export";
+import activity from "./routes/activity";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>().basePath("/api");
@@ -26,5 +27,6 @@ app.route("/matches", matches);
 app.route("/standings", standings);
 app.route("/players", players);
 app.route("/export", exportRoutes);
+app.route("/activity", activity);
 
 export default app;
