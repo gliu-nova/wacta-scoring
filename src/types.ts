@@ -56,8 +56,8 @@ export type LineResult = {
 
 export type TeamStanding = {
   team_id: number; team_name: string;
-  matches_played: number; match_wins: number; match_losses: number;
-  line_wins: number; line_losses: number;
+  matches_played: number; match_wins: number; match_losses: number; match_ties: number;
+  line_wins: number; line_losses: number; line_ties: number;
   games_won: number; games_lost: number;
   match_win_pct: number; game_win_pct: number;
 };

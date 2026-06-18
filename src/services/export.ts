@@ -43,10 +43,10 @@ export async function standingsCsv(db: D1Database, leagueId: number): Promise<st
   const rows = [
     csvRow(["League", league?.name ?? String(leagueId)]),
     "",
-    csvRow(["Rank", "Team", "Matches", "W", "L", "Match Win %", "Line W", "Line L", "Game Win %"]),
+    csvRow(["Ranking", "Team", "Matches", "W", "L", "T", "% Matches Won", "Line W", "Line L", "Line T", "% Games Won"]),
     ...standings.map((s, i) => csvRow([
-      i + 1, s.team_name, s.matches_played, s.match_wins, s.match_losses,
-      s.match_win_pct, s.line_wins, s.line_losses, s.game_win_pct,
+      i + 1, s.team_name, s.matches_played, s.match_wins, s.match_losses, s.match_ties,
+      s.match_win_pct, s.line_wins, s.line_losses, s.line_ties, s.game_win_pct,
     ])),
   ];
   return rows.join("\n");
