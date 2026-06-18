@@ -73,6 +73,37 @@ admin.post("/leagues/:id/lines", async (c) => {
   await logActivity(c.env.DB, user, `Added line template "${name?.trim()}"`);
   return c.json({ ok: true }, 201);
 });
+admin.put("/leagues/:leagueId/lines/:lineId", async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: "Forbidden" }, 403);
+  const leagueId = Number(c.req.param("leagueId"));
+  const lineId = Number(c.req.param("lineId"));
+  const { name, is_doubles } = await c.req.json<{ name?: string; is_doubles?: boolean }>();
+  const before = await c.env.DB.prepare(
+    "SELECT * FROM league_line_templates WHERE id = ? AND league_id = ?"
+  ).bind(lineId, leagueId).first<LeagueLineTemplate>();
+  if (!before) return c.json({ error: "Not found" }, 404);
+  const newName = name?.trim() ?? before.name;
+  const newDoubles = is_doubles !== undefined ? (is_doubles ? 1 : 0) : before.is_doubles;
+  await c.env.DB.prepare("UPDATE league_line_templates SET name = ?, is_doubles = ? WHERE id = ?")
+    .bind(newName, newDoubles, lineId).run();
+  await c.env.DB.prepare(
+    `UPDATE match_lines SET name = ?, is_doubles = ?
+     WHERE sort_order = ? AND match_id IN (SELECT id FROM matches WHERE league_id = ?)`
+  ).bind(newName, newDoubles, before.sort_order, leagueId).run();
+  const user = await getUser(c as never);
+  const league = await c.env.DB.prepare("SELECT name FROM leagues WHERE id = ?").bind(leagueId).first<{ name: string }>();
+  const changes: Array<{ field: string; before: string; after: string; cell?: string }> = [];
+  if (before.name !== newName) changes.push({ field: "Name", before: before.name, after: newName, cell: "name" });
+  if (before.is_doubles !== newDoubles) {
+    changes.push({ field: "Format", before: before.is_doubles ? "Doubles" : "Singles", after: newDoubles ? "Doubles" : "Singles", cell: "format" });
+  }
+  const details = buildFieldChangeDetails("line", String(lineId), changes);
+  if (details) {
+    details.subtitle = (details.subtitle ? `${league?.name ?? "League"}: ` : "") + details.subtitle + " (updated on all past matches too)";
+    await logActivityLinked(c.env.DB, user, `Updated line "${newName}"`, `/league-lines.html?id=${leagueId}`, details);
+  }
+  return c.json({ ok: true });
+});
 admin.delete("/leagues/:leagueId/lines/:lineId", async (c) => {
   const user = await requireAdmin(c);
   if (!user) return c.json({ error: "Forbidden" }, 403);

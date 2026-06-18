@@ -2,23 +2,87 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
-import { api, getUser, page, esc } from "/js/ui.js";
+import { api, getUser, page, esc, alert } from "/js/ui.js";
+import { fetchActivityFromUrl, renderChangeBanner, rowHighlight } from "/js/activity-highlight.js";
+
 if ((await getUser())?.role !== "admin") location.href="/login.html";
 const id = new URLSearchParams(location.search).get("id");
+const activity = await fetchActivityFromUrl();
+const hl = activity?.details?.highlights ?? [];
+let editId = null;
+
 page("Line Templates", `<a href="/leagues.html" class="text-emerald-600 text-sm">← Leagues</a>
-<h1 class="text-2xl font-bold my-4">Line Templates</h1>
+<h1 class="text-2xl font-bold my-2">Line Templates</h1>
+<p class="text-sm text-slate-500 mb-4">Rename lines here — past match scores are preserved and updated to show the new name.</p>
+<div id="change-banner"></div>
+<div id="msg" hidden></div>
 <div id="list" class="bg-white rounded-xl border mb-4"></div>
-<form id="form" class="flex gap-2 flex-wrap"><input name="name" required placeholder="Open Mens" class="border rounded-lg px-3 py-2">
+<form id="form" class="flex gap-2 flex-wrap items-center"><input name="name" required placeholder="Open Mens" class="border rounded-lg px-3 py-2">
 <label class="flex items-center gap-1 text-sm"><input type="checkbox" name="doubles" checked> Doubles</label>
-<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add Line</button></form>
+<div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4"><div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h2 class="font-bold mb-4">Edit Line</h2>
+  <input id="edit-name" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Line name">
+  <label class="flex items-center gap-2 text-sm mb-4"><input type="checkbox" id="edit-doubles"> Doubles</label>
+  <p class="text-xs text-slate-500 mb-4">Renaming updates this line on all existing matches in the division — scores stay linked.</p>
+  <div class="flex gap-2">
+    <button id="save-edit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Save</button>
+    <button id="cancel-edit" class="px-4 py-2 rounded-lg border">Cancel</button>
+  </div>
+</div></div>`, "Admin");
+
 async function load() {
   const lines = await api("/admin/leagues/"+id+"/lines");
-  document.getElementById("list").innerHTML = lines.map(l =>
-    `<div class="flex justify-between p-3 border-b"><span>${esc(l.name)} ${l.is_doubles?"":"(Singles)"}</span>
-    <button data-del="${l.id}" class="text-red-600 text-sm">Delete</button></div>`).join("") || "<p class='p-4 text-slate-400'>No lines yet</p>";
-  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await api(`/admin/leagues/${id}/lines/${b.dataset.del}`,{method:"DELETE"}); load(); });
+  document.getElementById("list").innerHTML = lines.map((l) =>
+    `<div class="flex justify-between items-center p-3 border-b" data-line-id="${l.id}">
+      <span class="${rowHighlight(hl, l.id, "name")} ${rowHighlight(hl, l.id, "format")} px-1 rounded">${esc(l.name)} ${l.is_doubles ? "" : "(Singles)"}</span>
+      <div class="flex gap-3">
+        <button data-edit="${l.id}" data-name="${esc(l.name)}" data-doubles="${l.is_doubles}" class="text-blue-600 text-sm">Edit</button>
+        <button data-del="${l.id}" class="text-red-600 text-sm">Delete</button>
+      </div>
+    </div>`).join("") || "<p class='p-4 text-slate-400'>No lines yet</p>";
+  const row = hl.length && document.querySelector(`[data-line-id="${hl[0].row}"]`);
+  if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+  document.querySelectorAll("[data-edit]").forEach((b) => {
+    b.onclick = () => {
+      editId = Number(b.dataset.edit);
+      document.getElementById("edit-name").value = b.dataset.name;
+      document.getElementById("edit-doubles").checked = b.dataset.doubles === "1";
+      document.getElementById("modal").classList.remove("hidden");
+    };
+  });
+  document.querySelectorAll("[data-del]").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Delete this line template? Existing match scores will NOT be removed, but new matches won't include this line.")) return;
+      await api(`/admin/leagues/${id}/lines/${b.dataset.del}`, { method: "DELETE" });
+      load();
+    };
+  });
 }
-document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
-  await api("/admin/leagues/"+id+"/lines",{method:"POST",body:JSON.stringify({name:fd.get("name"),is_doubles:!!fd.get("doubles")})}); e.target.reset(); load(); };
+
+document.getElementById("cancel-edit").onclick = () => document.getElementById("modal").classList.add("hidden");
+document.getElementById("save-edit").onclick = async () => {
+  try {
+    await api(`/admin/leagues/${id}/lines/${editId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: document.getElementById("edit-name").value,
+        is_doubles: document.getElementById("edit-doubles").checked,
+      }),
+    });
+    document.getElementById("modal").classList.add("hidden");
+    load();
+  } catch (e) { alert(document.getElementById("msg"), e.message); }
+};
+
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await api("/admin/leagues/"+id+"/lines", { method: "POST", body: JSON.stringify({ name: fd.get("name"), is_doubles: !!fd.get("doubles") }) });
+  e.target.reset();
+  load();
+};
+
+if (activity) document.getElementById("change-banner").innerHTML = renderChangeBanner(activity);
 load();
 </script></body></html>
