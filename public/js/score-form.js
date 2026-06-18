@@ -3,11 +3,9 @@ import { esc } from "/js/ui.js";
 function setInputs(line, r, n) {
   const h = r?.["home_set" + n];
   const a = r?.["away_set" + n];
-  return `<div class="grid grid-cols-4 gap-2 text-sm items-center"><span>Set ${n}</span>
+  return `<div class="grid grid-cols-3 gap-2 text-sm items-center"><span>Set ${n}</span>
     <input name="h${n}_${line.id}" type="number" min="0" value="${h ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-    <input name="a${n}_${line.id}" type="number" min="0" value="${a ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-    <div class="flex gap-1"><input name="htb${n}_${line.id}" placeholder="TB" value="${r?.["home_tb" + n] ?? ""}" class="border rounded px-1 py-1 w-12 text-xs">
-    <input name="atb${n}_${line.id}" placeholder="TB" value="${r?.["away_tb" + n] ?? ""}" class="border rounded px-1 py-1 w-12 text-xs"></div></div>`;
+    <input name="a${n}_${line.id}" type="number" min="0" value="${a ?? ""}" placeholder="—" class="border rounded px-2 py-1"></div>`;
 }
 
 export function renderLineCards(lineData, homeName, awayName) {
@@ -32,13 +30,11 @@ export function renderLineCards(lineData, homeName, awayName) {
           </label>
         </div>
       </div>
-      <p class="text-xs text-slate-400 mb-2">Set scores optional — enter what you played (1 set, 2 sets, 10-pt tiebreak, etc.)</p>
+      <p class="text-xs text-slate-400 mb-2">Set scores optional — e.g. 4-6, 6-2, 1-0</p>
       ${setInputs(line, r, 1)}${setInputs(line, r, 2)}
-      <div class="grid grid-cols-4 gap-2 text-sm items-center mt-2"><span>Set 3 / STB</span>
+      <div class="grid grid-cols-3 gap-2 text-sm items-center mt-2"><span>Set 3</span>
         <input name="h3_${line.id}" type="number" min="0" value="${r?.home_set3 ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-        <input name="a3_${line.id}" type="number" min="0" value="${r?.away_set3 ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-        <div class="flex gap-1"><input name="htb3_${line.id}" placeholder="TB" value="${r?.home_tb3 ?? ""}" class="border rounded px-1 py-1 w-12 text-xs">
-        <input name="atb3_${line.id}" placeholder="TB" value="${r?.away_tb3 ?? ""}" class="border rounded px-1 py-1 w-12 text-xs"></div></div>
+        <input name="a3_${line.id}" type="number" min="0" value="${r?.away_set3 ?? ""}" placeholder="—" class="border rounded px-2 py-1"></div>
       <div class="mt-4 pt-3 border-t">
         <p class="text-xs text-slate-400 mb-2">Who played (optional)</p>
         <div class="grid sm:grid-cols-2 gap-3">
@@ -65,16 +61,10 @@ export function parseScoresForm(fd, lineData) {
     winner: fd.get("winner_" + line.id),
     home_set1: num(fd, "h1_" + line.id),
     away_set1: num(fd, "a1_" + line.id),
-    home_tb1: fd.get("htb1_" + line.id) || undefined,
-    away_tb1: fd.get("atb1_" + line.id) || undefined,
     home_set2: num(fd, "h2_" + line.id),
     away_set2: num(fd, "a2_" + line.id),
-    home_tb2: fd.get("htb2_" + line.id) || undefined,
-    away_tb2: fd.get("atb2_" + line.id) || undefined,
     home_set3: num(fd, "h3_" + line.id),
     away_set3: num(fd, "a3_" + line.id),
-    home_tb3: fd.get("htb3_" + line.id) || undefined,
-    away_tb3: fd.get("atb3_" + line.id) || undefined,
     home_players_text: fd.get("home_players_" + line.id) || undefined,
     away_players_text: fd.get("away_players_" + line.id) || undefined,
   }));
