@@ -11,8 +11,8 @@ import { renderLeagueStandings } from "/js/standings-table.js";
 
 const user = await getUser();
 page("WACTA Scoring", `
-  <h1 class="text-2xl font-bold mb-2">Private Tennis League Scoring</h1>
-  <p class="text-slate-600 mb-6">Record match results, view standings, and track players.</p>
+  <h1 class="text-2xl font-bold mb-2">WACTA summer league scoring</h1>
+  <p class="text-slate-600 mb-6">Record match results, view standings, and export either to CSV.</p>
   <a href="/enter.html" class="block mb-6 p-6 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700">
     <h2 class="text-xl font-bold">Enter Match Results</h2>
     <p class="text-emerald-100 mt-1 text-sm">${user ? "Pick teams and enter scores — saves and publishes immediately" : "Submit scores for review — a logged-in user must approve before they appear in standings"}</p>
@@ -24,7 +24,7 @@ page("WACTA Scoring", `
   <div id="activity" class="bg-white rounded-xl border overflow-hidden"></div>`, "Home");
 
 document.getElementById("cards").innerHTML = [
-  ["/standings.html", "Standings", "Full standings with export"],
+  ["/standings.html", "Standings", "Full standings with CSV export"],
   ["/past-results.html", "Past Match Results", "Browse past matches with CSV export"],
 ].map(([h, t, d]) => `<a href="${h}" class="block p-5 bg-white rounded-xl border shadow-sm hover:border-emerald-400">
   <h3 class="font-semibold text-emerald-700">${t}</h3><p class="text-sm text-slate-500 mt-1">${d}</p></a>`).join("");
