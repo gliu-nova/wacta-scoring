@@ -1,5 +1,5 @@
-import { computeStandings } from "./standings";
-import type { League, Player } from "../types";
+import { computeStandings, countGames } from "./standings";
+import type { League, LineResult, Player } from "../types";
 
 function csvCell(value: string | number | null | undefined): string {
   const s = String(value ?? "");
@@ -11,30 +11,67 @@ function csvRow(cells: (string | number | null | undefined)[]): string {
   return cells.map(csvCell).join(",");
 }
 
-function formatScore(r: {
-  home_set1: number; away_set1: number; home_tb1: number | null; away_tb1: number | null;
-  home_set2: number; away_set2: number; home_tb2: number | null; away_tb2: number | null;
-  home_set3: number | null; away_set3: number | null; home_tb3: number | null; away_tb3: number | null;
-}): string {
-  const set = (h: number, a: number, htb: number | null, atb: number | null) => {
-    if (h === 6 && a === 6 && htb != null && atb != null) return `${htb}-${atb}`;
-    return `${h}-${a}`;
-  };
-  const parts = [
-    set(r.home_set1, r.away_set1, r.home_tb1, r.away_tb1),
-    set(r.home_set2, r.away_set2, r.home_tb2, r.away_tb2),
-  ];
-  if (r.home_set3 != null && r.away_set3 != null) parts.push(set(r.home_set3, r.away_set3, r.home_tb3, r.away_tb3));
-  return parts.join(" ");
+function formatMatchDate(date: string): string {
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return date;
+  return `${m[2]}/${m[3]}`;
 }
 
-function playerName(p: Player | undefined): string {
-  if (!p) return "";
-  return `${p.first_name} ${p.last_name}`.trim();
+function lineWinnerLabel(winner: string, homeName: string, awayName: string): string {
+  if (winner === "home") return homeName;
+  if (winner === "away") return awayName;
+  if (winner === "tie") return "Tie";
+  return "";
 }
 
-function lineupNames(ids: (number | null)[], pmap: Map<number, Player>): string {
-  return ids.map((id) => (id ? playerName(pmap.get(id)) : "")).filter(Boolean).join(" / ");
+function lineGameScore(r: LineResult): string {
+  const [homeGames, awayGames] = countGames(r, "home");
+  return `${homeGames}-${awayGames}`;
+}
+
+function formatOverall(
+  homeW: number, homeL: number, homeT: number,
+  awayW: number, awayL: number, awayT: number,
+  homeName: string, awayName: string,
+): string {
+  if (homeW > awayW) return `${homeName} wins ${homeW}-${homeL}-${homeT}`;
+  if (awayW > homeW) return `${awayName} wins ${awayW}-${awayL}-${awayT}`;
+  return `Tie ${homeW}-${homeL}-${homeT}`;
+}
+
+function formatGamesWon(homeName: string, homeGames: number, awayName: string, awayGames: number): string {
+  return `${awayName}${awayGames} - ${homeName}${homeGames}`;
+}
+
+type LineColumn = { sort_order: number; name: string };
+
+async function getLineColumns(db: D1Database, leagueId?: number): Promise<LineColumn[]> {
+  if (leagueId) {
+    const rows = await db.prepare(
+      "SELECT sort_order, name FROM league_line_templates WHERE league_id = ? ORDER BY sort_order",
+    ).bind(leagueId).all<LineColumn>();
+    return rows.results ?? [];
+  }
+  const row = await db.prepare(`
+    SELECT MAX(line_cnt) as n FROM (
+      SELECT COUNT(*) as line_cnt FROM match_lines ml
+      JOIN line_results lr ON lr.match_line_id = ml.id
+      GROUP BY ml.match_id
+    )
+  `).first<{ n: number | null }>();
+  const n = row?.n ?? 0;
+  return Array.from({ length: n }, (_, i) => ({ sort_order: i, name: "" }));
+}
+
+function buildMatchHeader(lineCols: LineColumn[], includeLeague: boolean): string[] {
+  const header = ["Date", "Home Team", "Guest Team"];
+  if (includeLeague) header.unshift("League");
+  for (let i = 0; i < lineCols.length; i++) {
+    const label = lineCols[i].name ? `D${i + 1} (${lineCols[i].name})` : `D${i + 1}`;
+    header.push(`${label} Winner`, `${label} Score`);
+  }
+  header.push("Overall", "Games won");
+  return header;
 }
 
 export async function standingsCsv(db: D1Database, leagueId: number): Promise<string> {
@@ -67,20 +104,6 @@ export async function playersCsv(db: D1Database, leagueId?: number): Promise<str
   ].join("\n");
 }
 
-function sidePlayers(lineup: {
-  home_player1_id: number | null; home_player2_id: number | null;
-  away_player1_id: number | null; away_player2_id: number | null;
-  home_players_text?: string | null; away_players_text?: string | null;
-} | null, side: "home" | "away", pmap: Map<number, Player>): string {
-  if (!lineup) return "";
-  const text = side === "home" ? lineup.home_players_text : lineup.away_players_text;
-  if (text?.trim()) return text.trim();
-  const ids = side === "home"
-    ? [lineup.home_player1_id, lineup.home_player2_id]
-    : [lineup.away_player1_id, lineup.away_player2_id];
-  return lineupNames(ids, pmap);
-}
-
 export async function matchesCsv(db: D1Database, leagueId?: number): Promise<string> {
   let sql = `SELECT m.*, l.name league_name, ht.name home_name, at.name away_name
     FROM matches m JOIN leagues l ON l.id = m.league_id
@@ -93,37 +116,53 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
   const binds: number[] = [];
   if (leagueId) { sql += " AND m.league_id = ?"; binds.push(leagueId); }
   sql += " ORDER BY m.match_date DESC, m.id DESC";
-  const matches = await db.prepare(sql).bind(...binds).all();
-  const players = await db.prepare("SELECT * FROM players").all<Player>();
-  const pmap = new Map((players.results ?? []).map((p) => [p.id, p]));
-  const rows = [csvRow([
-    "League", "Date", "Home Team", "Away Team", "Status", "Location",
-    "Line", "Home Players", "Away Players", "Score", "Winner",
-  ])];
+
+  const [matches, lineCols] = await Promise.all([
+    db.prepare(sql).bind(...binds).all(),
+    getLineColumns(db, leagueId),
+  ]);
+  const includeLeague = !leagueId;
+  const rows = [csvRow(buildMatchHeader(lineCols, includeLeague))];
+
   for (const m of matches.results ?? []) {
     const match = m as {
       id: number; league_name: string; match_date: string; home_name: string; away_name: string;
-      status: string; location: string | null;
     };
     const lines = await db.prepare("SELECT * FROM match_lines WHERE match_id = ? ORDER BY sort_order").bind(match.id).all();
+    const resultsByOrder = new Map<number, LineResult>();
+    let homeW = 0, homeL = 0, homeT = 0, awayW = 0, awayL = 0, awayT = 0;
+    let homeGames = 0, awayGames = 0;
+
     for (const line of lines.results ?? []) {
-      const l = line as { id: number; name: string };
-      const lineup = await db.prepare("SELECT * FROM lineups WHERE match_line_id = ?").bind(l.id).first<{
-        home_player1_id: number | null; home_player2_id: number | null;
-        away_player1_id: number | null; away_player2_id: number | null;
-        home_players_text: string | null; away_players_text: string | null;
-      }>();
-      const result = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(l.id).first();
+      const l = line as { id: number; sort_order: number };
+      const result = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(l.id).first<LineResult>();
       if (!result) continue;
-      rows.push(csvRow([
-        match.league_name, match.match_date, match.home_name, match.away_name, match.status, match.location,
-        l.name,
-        sidePlayers(lineup, "home", pmap),
-        sidePlayers(lineup, "away", pmap),
-        formatScore(result as never),
-        (result as { winner: string }).winner,
-      ]));
+      resultsByOrder.set(l.sort_order, result);
+      const [hg, ag] = countGames(result, "home");
+      homeGames += hg;
+      awayGames += ag;
+      if (result.winner === "home") { homeW++; awayL++; }
+      else if (result.winner === "away") { awayW++; homeL++; }
+      else { homeT++; awayT++; }
     }
+
+    const row: (string | number | null | undefined)[] = [];
+    if (includeLeague) row.push(match.league_name);
+    row.push(formatMatchDate(match.match_date), match.home_name, match.away_name);
+    for (const col of lineCols) {
+      const result = resultsByOrder.get(col.sort_order);
+      if (result) {
+        row.push(lineWinnerLabel(result.winner, match.home_name, match.away_name));
+        row.push(lineGameScore(result));
+      } else {
+        row.push("", "");
+      }
+    }
+    row.push(
+      formatOverall(homeW, homeL, homeT, awayW, awayL, awayT, match.home_name, match.away_name),
+      formatGamesWon(match.home_name, homeGames, match.away_name, awayGames),
+    );
+    rows.push(csvRow(row));
   }
   return rows.join("\n");
 }

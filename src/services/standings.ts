@@ -1,7 +1,7 @@
 import type { LineResult, Side, TeamStanding } from "../types";
 import { setWinner } from "./validation";
 
-function countGames(r: LineResult, side: Side): [number, number] {
+export function countGames(r: LineResult, side: Side): [number, number] {
   const sets: [number, number, number | null, number | null][] = [
     [r.home_set1, r.away_set1, r.home_tb1, r.away_tb1],
     [r.home_set2, r.away_set2, r.home_tb2, r.away_tb2],
