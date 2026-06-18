@@ -17,7 +17,8 @@ if (!user) {
   </div>`, "Enter Match Results");
 } else {
   page("Scores", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
-  <h1 class="text-2xl font-bold my-2">Enter Scores</h1>
+  <h1 class="text-2xl font-bold my-2">Edit Scores</h1>
+  <p class="text-sm text-slate-500 mb-4">Changes publish immediately and update standings.</p>
   <p class="text-slate-500 mb-4">${esc(m.home_name)} vs ${esc(m.away_name)} · ${m.match_date}</p>
   <div id="msg" hidden></div><form id="form" class="space-y-4">${renderLineCards(data.lineData, m.home_name, m.away_name)}</form>
   <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700">Save Scores</button>`, "Enter Match Results");

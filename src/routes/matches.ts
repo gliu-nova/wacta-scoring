@@ -128,6 +128,37 @@ matches.get("/:id", async (c) => {
   return c.json({ match, lineData, can_edit: loggedIn, can_score: loggedIn });
 });
 
+matches.put("/:id", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const matchId = Number(c.req.param("id"));
+  const match = await c.env.DB.prepare("SELECT * FROM matches WHERE id = ?").bind(matchId).first<Match>();
+  if (!match) return c.json({ error: "Not found" }, 404);
+  const b = await c.req.json<{ match_date?: string; location?: string; home_team_id?: number; away_team_id?: number }>();
+  const homeId = b.home_team_id ?? match.home_team_id;
+  const awayId = b.away_team_id ?? match.away_team_id;
+  if (homeId === awayId) return c.json({ error: "Teams must differ" }, 400);
+  if (b.home_team_id || b.away_team_id) {
+    for (const tid of [homeId, awayId]) {
+      const team = await c.env.DB.prepare("SELECT id FROM teams WHERE id = ? AND league_id = ?").bind(tid, match.league_id).first();
+      if (!team) return c.json({ error: "Teams must belong to this match's league" }, 400);
+    }
+  }
+  await c.env.DB.prepare(
+    "UPDATE matches SET match_date = ?, location = ?, home_team_id = ?, away_team_id = ? WHERE id = ?"
+  ).bind(
+    b.match_date ?? match.match_date,
+    b.location !== undefined ? (b.location?.trim() || null) : match.location,
+    homeId, awayId, matchId,
+  ).run();
+  const info = await c.env.DB.prepare(
+    `SELECT ht.name as home_name, at.name as away_name FROM matches m
+     JOIN teams ht ON ht.id=m.home_team_id JOIN teams at ON at.id=m.away_team_id WHERE m.id = ?`
+  ).bind(matchId).first<{ home_name: string; away_name: string }>();
+  if (info) await logActivity(c.env.DB, user, `Updated match ${info.home_name} vs ${info.away_name}`, `/match.html?id=${matchId}`);
+  return c.json({ ok: true });
+});
+
 matches.post("/", async (c) => {
   const user = await getUser(c);
   if (!user) return c.json({ error: "Unauthorized" }, 401);
@@ -153,7 +184,12 @@ matches.put("/:id/lineup", async (c) => {
   const matchId = Number(c.req.param("id"));
   const match = await c.env.DB.prepare("SELECT * FROM matches WHERE id = ?").bind(matchId).first<Match>();
   if (!match) return c.json({ error: "Not found" }, 404);
-  const { lineups } = await c.req.json<{ lineups: Array<{ match_line_id: number; home_player1_id?: number; home_player2_id?: number; away_player1_id?: number; away_player2_id?: number }> }>();
+  const { lineups } = await c.req.json<{ lineups: Array<{
+    match_line_id: number;
+    home_player1_id?: number; home_player2_id?: number;
+    away_player1_id?: number; away_player2_id?: number;
+    home_players_text?: string; away_players_text?: string;
+  }> }>();
   const warnings: string[] = [];
   const players = await c.env.DB.prepare("SELECT * FROM players").all<Player>();
   const pmap = new Map((players.results ?? []).map((p) => [p.id, p]));
@@ -163,12 +199,18 @@ matches.put("/:id/lineup", async (c) => {
     const ap = [pmap.get(lu.away_player1_id!), line?.is_doubles ? pmap.get(lu.away_player2_id!) : undefined].filter(Boolean) as Player[];
     warnings.push(...ratingWarnings(hp, ap));
     const existing = await c.env.DB.prepare("SELECT id FROM lineups WHERE match_line_id = ?").bind(lu.match_line_id).first();
+    const homeText = lu.home_players_text?.trim() || null;
+    const awayText = lu.away_players_text?.trim() || null;
     if (existing) {
-      await c.env.DB.prepare("UPDATE lineups SET home_player1_id=?, home_player2_id=?, away_player1_id=?, away_player2_id=?, updated_at=datetime('now') WHERE match_line_id=?")
-        .bind(lu.home_player1_id ?? null, lu.home_player2_id ?? null, lu.away_player1_id ?? null, lu.away_player2_id ?? null, lu.match_line_id).run();
+      await c.env.DB.prepare(`UPDATE lineups SET home_player1_id=?, home_player2_id=?, away_player1_id=?, away_player2_id=?,
+        home_players_text=?, away_players_text=?, updated_at=datetime('now') WHERE match_line_id=?`)
+        .bind(lu.home_player1_id ?? null, lu.home_player2_id ?? null, lu.away_player1_id ?? null, lu.away_player2_id ?? null,
+          homeText, awayText, lu.match_line_id).run();
     } else {
-      await c.env.DB.prepare("INSERT INTO lineups (match_line_id, home_player1_id, home_player2_id, away_player1_id, away_player2_id) VALUES (?, ?, ?, ?, ?)")
-        .bind(lu.match_line_id, lu.home_player1_id ?? null, lu.home_player2_id ?? null, lu.away_player1_id ?? null, lu.away_player2_id ?? null).run();
+      await c.env.DB.prepare(`INSERT INTO lineups (match_line_id, home_player1_id, home_player2_id, away_player1_id, away_player2_id, home_players_text, away_players_text)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .bind(lu.match_line_id, lu.home_player1_id ?? null, lu.home_player2_id ?? null, lu.away_player1_id ?? null, lu.away_player2_id ?? null,
+          homeText, awayText).run();
     }
   }
   await updateMatchStatus(c.env.DB, matchId);

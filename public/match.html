@@ -2,18 +2,36 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
-import { api, getUser, page, esc } from "/js/ui.js";
+import { api, getUser, page, esc, alert } from "/js/ui.js";
 const id = new URLSearchParams(location.search).get("id");
 const [data, user] = await Promise.all([api("/matches/"+id), getUser()]);
 const m = data.match;
 const loginUrl = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 page("Match", `<a href="/enter.html" class="text-emerald-600 text-sm">← Enter Match Results</a>
-<h1 class="text-2xl font-bold mt-2">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
-<p class="text-slate-500 mb-4">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span>${m.location ? ` · ${esc(m.location)}` : ""}</p>
+<h1 class="text-2xl font-bold mt-2" id="match-title">${esc(m.home_name)} <span class="text-slate-400">vs</span> ${esc(m.away_name)}</h1>
+<p class="text-slate-500 mb-4" id="match-meta">${m.match_date} · ${esc(m.league_name)} · <span class="capitalize">${m.status.replace("_"," ")}</span>${m.location ? ` · ${esc(m.location)}` : ""}</p>
 <div id="notice" class="mb-4"></div>
 <div class="flex flex-wrap gap-3 mb-6" id="actions"></div>
 <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr>
-<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>`, "Enter Match Results");
+<th class="p-3 text-left">Line</th><th class="p-3 text-left">${esc(m.home_name)}</th><th class="p-3 text-left">${esc(m.away_name)}</th><th class="p-3">Score</th><th class="p-3">Result</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div id="edit-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4"><div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h2 class="font-bold mb-4">Edit Match Details</h2>
+  <div id="edit-msg" hidden></div>
+  <label class="text-sm text-slate-500">Date</label>
+  <input id="edit-date" type="date" class="w-full border rounded-lg px-3 py-2 mt-1 mb-3">
+  <label class="text-sm text-slate-500">Location</label>
+  <input id="edit-loc" placeholder="Location (optional)" class="w-full border rounded-lg px-3 py-2 mt-1 mb-3">
+  <div id="edit-teams" class="hidden">
+    <label class="text-sm text-slate-500">Home team</label>
+    <select id="edit-home" class="w-full border rounded-lg px-3 py-2 mt-1 mb-3"></select>
+    <label class="text-sm text-slate-500">Away team</label>
+    <select id="edit-away" class="w-full border rounded-lg px-3 py-2 mt-1 mb-3"></select>
+  </div>
+  <div class="flex gap-2">
+    <button id="save-edit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Save</button>
+    <button id="cancel-edit" class="px-4 py-2 rounded-lg border">Cancel</button>
+  </div>
+</div></div>`, "Enter Match Results");
 const players = await api("/admin/players");
 const pmap = Object.fromEntries(players.map(p => [p.id, p.first_name+" "+p.last_name]));
 if (!user) {
@@ -22,8 +40,36 @@ if (!user) {
   </div>`;
 } else {
   document.getElementById("actions").innerHTML = `
-    <a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Set Lineup</a>
-    <a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>`;
+    <a href="/lineup.html?id=${id}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Edit Lineup</a>
+    <a href="/scores.html?id=${id}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>
+    <button id="edit-match" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Edit Match Details</button>`;
+  document.getElementById("edit-match").onclick = async () => {
+    document.getElementById("edit-date").value = m.match_date;
+    document.getElementById("edit-loc").value = m.location || "";
+    if (user.role === "admin") {
+      const teams = (await api("/admin/teams")).filter(t => t.league_id === m.league_id);
+      const opts = (sel) => teams.map(t => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+      document.getElementById("edit-home").innerHTML = opts(m.home_team_id);
+      document.getElementById("edit-away").innerHTML = opts(m.away_team_id);
+      document.getElementById("edit-teams").classList.remove("hidden");
+    }
+    document.getElementById("edit-modal").classList.remove("hidden");
+  };
+  document.getElementById("cancel-edit").onclick = () => document.getElementById("edit-modal").classList.add("hidden");
+  document.getElementById("save-edit").onclick = async () => {
+    const body = {
+      match_date: document.getElementById("edit-date").value,
+      location: document.getElementById("edit-loc").value,
+    };
+    if (user.role === "admin") {
+      body.home_team_id = Number(document.getElementById("edit-home").value);
+      body.away_team_id = Number(document.getElementById("edit-away").value);
+    }
+    try {
+      await api("/matches/" + id, { method: "PUT", body: JSON.stringify(body) });
+      location.reload();
+    } catch (e) { alert(document.getElementById("edit-msg"), e.message); }
+  };
 }
 document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,result}) => {
   const hp = lineup?.home_players_text || (lineup ? [lineup.home_player1_id,lineup.home_player2_id].filter(Boolean).map(i=>pmap[i]).join(", ") : "") || "—";

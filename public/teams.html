@@ -2,25 +2,77 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
-import { api, getUser, page, esc } from "/js/ui.js";
+import { api, getUser, page, esc, alert } from "/js/ui.js";
 if ((await getUser())?.role !== "admin") location.href="/login.html";
-const [teams, leagues] = await Promise.all([api("/admin/teams"), api("/admin/leagues")]);
+const leagues = await api("/admin/leagues");
 const lmap = Object.fromEntries(leagues.map(l => [l.id, l.name]));
+let teams = [];
+let editId = null;
+
 page("Teams", `<div class="flex justify-between mb-6"><h1 class="text-2xl font-bold">Teams</h1></div>
+<p class="text-sm text-slate-500 mb-4">Rename teams here — past match results and standings stay linked.</p>
+<div id="msg" hidden></div>
 <div id="list" class="bg-white rounded-xl border mb-6"></div>
 <h2 class="font-semibold mb-2">Add Team</h2>
 <form id="form" class="flex flex-wrap gap-2 bg-white p-4 rounded-xl border">
 <input name="name" required placeholder="Team name" class="border rounded-lg px-3 py-2">
 <select name="league_id" class="border rounded-lg px-3 py-2">${leagues.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select>
-<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>
+<div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4"><div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h2 class="font-bold mb-4">Edit Team</h2>
+  <input id="edit-name" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Team name">
+  <select id="edit-league" class="w-full border rounded-lg px-3 py-2 mb-4">${leagues.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select>
+  <div class="flex gap-2">
+    <button id="save-edit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Save</button>
+    <button id="cancel-edit" class="px-4 py-2 rounded-lg border">Cancel</button>
+  </div>
+</div></div>`, "Admin");
+
 function load() {
-  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Team</th><th class="p-3 text-left">League</th><th></th></tr></thead><tbody>${
-    teams.map((t,i) => `<tr class="border-t"><td class="p-3 font-medium">${esc(t.name)}</td><td class="p-3 text-slate-500">${esc(lmap[t.league_id])}</td>
-    <td class="p-3"><button data-i="${i}" class="text-red-600 text-sm del">Delete</button></td></tr>`).join("")}</tbody></table>`;
-  document.querySelectorAll(".del").forEach(b => b.onclick = async () => { await api("/admin/teams/"+teams[b.dataset.i].id,{method:"DELETE"}); teams.splice(b.dataset.i,1); load(); });
+  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Team</th><th class="p-3 text-left">League</th><th class="p-3">Actions</th></tr></thead><tbody>${
+    teams.map((t) => `<tr class="border-t"><td class="p-3 font-medium">${esc(t.name)}</td><td class="p-3 text-slate-500">${esc(lmap[t.league_id])}</td>
+    <td class="p-3"><button data-id="${t.id}" data-name="${esc(t.name)}" data-league="${t.league_id}" class="text-blue-600 text-sm mr-3 edit">Edit</button>
+    <button data-id="${t.id}" class="text-red-600 text-sm del">Delete</button></td></tr>`).join("")}</tbody></table>`;
+  document.querySelectorAll(".edit").forEach((b) => {
+    b.onclick = () => {
+      editId = Number(b.dataset.id);
+      document.getElementById("edit-name").value = b.dataset.name;
+      document.getElementById("edit-league").value = b.dataset.league;
+      document.getElementById("modal").classList.remove("hidden");
+    };
+  });
+  document.querySelectorAll(".del").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Delete this team? Past matches will also be removed.")) return;
+      await api("/admin/teams/" + b.dataset.id, { method: "DELETE" });
+      teams = await api("/admin/teams");
+      load();
+    };
+  });
 }
-document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
-  await api("/admin/teams",{method:"POST",body:JSON.stringify({name:fd.get("name"),league_id:Number(fd.get("league_id"))})});
-  teams.push(...await api("/admin/teams")); location.reload(); };
+
+document.getElementById("cancel-edit").onclick = () => document.getElementById("modal").classList.add("hidden");
+document.getElementById("save-edit").onclick = async () => {
+  try {
+    await api("/admin/teams/" + editId, { method: "PUT", body: JSON.stringify({
+      name: document.getElementById("edit-name").value,
+      league_id: Number(document.getElementById("edit-league").value),
+    })});
+    document.getElementById("modal").classList.add("hidden");
+    teams = await api("/admin/teams");
+    load();
+  } catch (e) { alert(document.getElementById("msg"), e.message); }
+};
+
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await api("/admin/teams", { method: "POST", body: JSON.stringify({ name: fd.get("name"), league_id: Number(fd.get("league_id")) }) });
+  teams = await api("/admin/teams");
+  e.target.reset();
+  load();
+};
+
+teams = await api("/admin/teams");
 load();
 </script></body></html>

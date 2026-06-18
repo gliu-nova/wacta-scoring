@@ -2,11 +2,15 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
-import { api, getUser, page, esc } from "/js/ui.js";
+import { api, getUser, page, esc, alert } from "/js/ui.js";
 if ((await getUser())?.role !== "admin") location.href="/login.html";
-const [teams] = await Promise.all([api("/admin/teams")]);
+const teams = await api("/admin/teams");
 const tmap = Object.fromEntries(teams.map(t => [t.id, t.name]));
-page("Players", `<h1 class="text-2xl font-bold mb-4">Players</h1>
+let editId = null;
+
+page("Players", `<h1 class="text-2xl font-bold mb-2">Players</h1>
+<p class="text-sm text-slate-500 mb-4">Edit names or move players between teams — match history stays linked by player ID.</p>
+<div id="msg" hidden></div>
 <input id="q" placeholder="Search..." class="border rounded-lg px-3 py-2 mb-4 w-full max-w-xs">
 <div id="list" class="bg-white rounded-xl border mb-6"></div>
 <form id="form" class="flex flex-wrap gap-2 bg-white p-4 rounded-xl border items-end">
@@ -14,16 +18,86 @@ page("Players", `<h1 class="text-2xl font-bold mb-4">Players</h1>
 <input name="last_name" required placeholder="Last" class="border rounded px-2 py-1">
 <input name="ntrp_rating" type="number" step="0.5" value="3.5" class="border rounded px-2 py-1 w-20">
 <select name="team_id" class="border rounded px-2 py-1"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>
-<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>`, "Admin");
-async function load(q="") {
-  const players = await api("/admin/players"+(q?`?q=${encodeURIComponent(q)}`:""));
-  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Name</th><th class="p-3">NTRP</th><th class="p-3">Team</th></tr></thead><tbody>${
-    players.map(p => `<tr class="border-t"><td class="p-3"><a href="/player.html?id=${p.id}" class="text-emerald-700 font-medium">${esc(p.first_name)} ${esc(p.last_name)}</a></td>
-    <td class="p-3">${p.ntrp_rating.toFixed(1)}</td><td class="p-3 text-slate-500">${esc(tmap[p.team_id]||"—")}</td></tr>`).join("")}</tbody></table>`;
+<button class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Add</button></form>
+<div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4"><div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h2 class="font-bold mb-4">Edit Player</h2>
+  <div class="grid grid-cols-2 gap-2 mb-3">
+    <input id="edit-first" placeholder="First" class="border rounded-lg px-3 py-2">
+    <input id="edit-last" placeholder="Last" class="border rounded-lg px-3 py-2">
+  </div>
+  <input id="edit-email" placeholder="Email (optional)" class="w-full border rounded-lg px-3 py-2 mb-3">
+  <div class="flex gap-2 mb-3">
+    <input id="edit-ntrp" type="number" step="0.5" class="border rounded-lg px-3 py-2 w-24">
+    <select id="edit-team" class="flex-1 border rounded-lg px-3 py-2"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>
+  </div>
+  <div class="flex gap-2">
+    <button id="save-edit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg">Save</button>
+    <button id="cancel-edit" class="px-4 py-2 rounded-lg border">Cancel</button>
+  </div>
+</div></div>`, "Admin");
+
+async function load(q = "") {
+  const players = await api("/admin/players" + (q ? `?q=${encodeURIComponent(q)}` : ""));
+  document.getElementById("list").innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr>
+    <th class="p-3 text-left">Name</th><th class="p-3">NTRP</th><th class="p-3">Team</th><th class="p-3">Actions</th></tr></thead><tbody>${
+    players.map((p) => `<tr class="border-t">
+      <td class="p-3"><a href="/player.html?id=${p.id}" class="text-emerald-700 font-medium">${esc(p.first_name)} ${esc(p.last_name)}</a></td>
+      <td class="p-3">${p.ntrp_rating.toFixed(1)}</td>
+      <td class="p-3 text-slate-500">${esc(tmap[p.team_id] || "—")}</td>
+      <td class="p-3">
+        <button data-id="${p.id}" data-first="${esc(p.first_name)}" data-last="${esc(p.last_name)}"
+          data-ntrp="${p.ntrp_rating}" data-team="${p.team_id ?? ""}" data-email="${esc(p.email || "")}"
+          class="text-blue-600 text-sm mr-3 edit">Edit</button>
+        <button data-id="${p.id}" class="text-red-600 text-sm del">Delete</button>
+      </td></tr>`).join("")
+  }</tbody></table>`;
+  document.querySelectorAll(".edit").forEach((b) => {
+    b.onclick = () => {
+      editId = Number(b.dataset.id);
+      document.getElementById("edit-first").value = b.dataset.first;
+      document.getElementById("edit-last").value = b.dataset.last;
+      document.getElementById("edit-ntrp").value = b.dataset.ntrp;
+      document.getElementById("edit-team").value = b.dataset.team;
+      document.getElementById("edit-email").value = b.dataset.email;
+      document.getElementById("modal").classList.remove("hidden");
+    };
+  });
+  document.querySelectorAll(".del").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Delete this player? They will be removed from future lineups but past match text records are unchanged.")) return;
+      await api("/admin/players/" + b.dataset.id, { method: "DELETE" });
+      load(document.getElementById("q").value);
+    };
+  });
 }
+
+document.getElementById("cancel-edit").onclick = () => document.getElementById("modal").classList.add("hidden");
+document.getElementById("save-edit").onclick = async () => {
+  const teamVal = document.getElementById("edit-team").value;
+  try {
+    await api("/admin/players/" + editId, { method: "PUT", body: JSON.stringify({
+      first_name: document.getElementById("edit-first").value,
+      last_name: document.getElementById("edit-last").value,
+      email: document.getElementById("edit-email").value || null,
+      ntrp_rating: Number(document.getElementById("edit-ntrp").value),
+      team_id: teamVal ? Number(teamVal) : null,
+    })});
+    document.getElementById("modal").classList.add("hidden");
+    load(document.getElementById("q").value);
+  } catch (e) { alert(document.getElementById("msg"), e.message); }
+};
+
 document.getElementById("q").oninput = (e) => load(e.target.value);
-document.getElementById("form").onsubmit = async (e) => { e.preventDefault(); const fd=new FormData(e.target);
-  await api("/admin/players",{method:"POST",body:JSON.stringify({first_name:fd.get("first_name"),last_name:fd.get("last_name"),ntrp_rating:Number(fd.get("ntrp_rating")),team_id:fd.get("team_id")?Number(fd.get("team_id")):null})});
-  e.target.reset(); load(); };
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await api("/admin/players", { method: "POST", body: JSON.stringify({
+    first_name: fd.get("first_name"), last_name: fd.get("last_name"),
+    ntrp_rating: Number(fd.get("ntrp_rating")),
+    team_id: fd.get("team_id") ? Number(fd.get("team_id")) : null,
+  })});
+  e.target.reset();
+  load(document.getElementById("q").value);
+};
 load();
 </script></body></html>

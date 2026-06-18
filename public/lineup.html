@@ -20,7 +20,9 @@ const [homeP, awayP] = await Promise.all([
 ]);
 const opts = (ps, sel) => `<option value="">—</option>${ps.map(p=>`<option value="${p.id}" ${sel===p.id?"selected":""}>${esc(p.first_name)} ${esc(p.last_name)} (${p.ntrp_rating})</option>`).join("")}`;
 page("Lineup", `<a href="/match.html?id=${id}" class="text-emerald-600 text-sm">← Match</a>
-<h1 class="text-2xl font-bold my-4">Lineup</h1><div id="msg" hidden></div><form id="form" class="space-y-4"></form>
+<h1 class="text-2xl font-bold my-4">Edit Lineup</h1>
+<p class="text-sm text-slate-500 mb-4">Pick roster players or type names — changes apply to this match only.</p>
+<div id="msg" hidden></div><form id="form" class="space-y-4"></form>
 <button form="form" class="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg">Save Lineup</button>`, "Enter Match Results");
 document.getElementById("form").innerHTML = data.lineData.map(({line,lineup}) => `
   <div class="bg-white p-4 rounded-xl border"><h3 class="font-semibold mb-3">${esc(line.name)}</h3>
@@ -28,9 +30,11 @@ document.getElementById("form").innerHTML = data.lineData.map(({line,lineup}) =>
     <div><label class="text-sm text-slate-500">${esc(m.home_name)}</label>
       <select name="h1_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(homeP,lineup?.home_player1_id)}</select>
       ${line.is_doubles?`<select name="h2_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(homeP,lineup?.home_player2_id)}</select>`:""}
+      <input name="home_players_${line.id}" placeholder="Or type names" value="${esc(lineup?.home_players_text ?? "")}" class="w-full border rounded-lg px-2 py-1 mt-2 text-sm">
     </div><div><label class="text-sm text-slate-500">${esc(m.away_name)}</label>
       <select name="a1_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(awayP,lineup?.away_player1_id)}</select>
       ${line.is_doubles?`<select name="a2_${line.id}" class="w-full border rounded-lg px-2 py-1 mt-1">${opts(awayP,lineup?.away_player2_id)}</select>`:""}
+      <input name="away_players_${line.id}" placeholder="Or type names" value="${esc(lineup?.away_players_text ?? "")}" class="w-full border rounded-lg px-2 py-1 mt-2 text-sm">
     </div></div></div>`).join("");
 document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault(); const fd = new FormData(e.target);
@@ -40,6 +44,8 @@ document.getElementById("form").onsubmit = async (e) => {
     home_player2_id: line.is_doubles ? Number(fd.get("h2_"+line.id))||undefined : undefined,
     away_player1_id: Number(fd.get("a1_"+line.id))||undefined,
     away_player2_id: line.is_doubles ? Number(fd.get("a2_"+line.id))||undefined : undefined,
+    home_players_text: fd.get("home_players_"+line.id) || undefined,
+    away_players_text: fd.get("away_players_"+line.id) || undefined,
   }));
   try {
     const r = await api("/matches/"+id+"/lineup",{method:"PUT",body:JSON.stringify({lineups})});
