@@ -3,30 +3,9 @@
 <body class="bg-slate-50"><div id="app"></div>
 <script type="module">
 import { api, page, esc, downloadCsv } from "/js/ui.js";
+import { renderLeagueStandings } from "/js/standings-table.js";
 
 const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
-
-function wlt(w, l, t) {
-  return `<span class="text-green-700">${w}</span>-<span class="text-red-600">${l}</span>-<span class="text-slate-500">${t}</span>`;
-}
-
-function renderTable(standings) {
-  return `<table class="w-full text-sm"><thead class="bg-slate-100"><tr>
-    <th class="p-3 text-left">Ranking</th><th class="p-3 text-left">Team</th>
-    <th class="p-3">Record (W-L-T)</th>
-    <th class="p-3">% of Matches Won</th>
-    <th class="p-3">Lines (W-L-T)</th>
-    <th class="p-3">% of Games Won</th></tr></thead><tbody>${
-    standings.map((t, i) => `<tr class="border-t">
-      <td class="p-3 text-slate-400">${i + 1}</td>
-      <td class="p-3 font-medium">${esc(t.team_name)}</td>
-      <td class="p-3 text-center">${wlt(t.match_wins, t.match_losses, t.match_ties)}</td>
-      <td class="p-3 text-center">${t.match_win_pct}%</td>
-      <td class="p-3 text-center">${wlt(t.line_wins, t.line_losses, t.line_ties)}</td>
-      <td class="p-3 text-center font-medium">${t.game_win_pct}%</td></tr>`).join("")
-    || `<tr><td colspan="6" class="p-8 text-center text-slate-400">No completed matches yet</td></tr>`
-  }</tbody></table>`;
-}
 
 page("Standings", `<div class="flex flex-wrap justify-between gap-3 mb-4">
   <h1 class="text-2xl font-bold">Standings</h1>
@@ -40,10 +19,7 @@ const sections = await Promise.all(leagues.map(async (lg) => ({
 })));
 
 document.getElementById("tables").innerHTML = sections.map(({ league, standings }) =>
-  `<div class="bg-white rounded-xl border overflow-x-auto">
-    <h2 class="text-lg font-semibold p-4 border-b bg-slate-50">${esc(league.name)}</h2>
-    ${renderTable(standings)}
-  </div>`).join("");
+  renderLeagueStandings(league.name, standings)).join("");
 
 document.getElementById("export-btn").onclick = () => {
   for (const lg of leagues) downloadCsv(`/export/standings.csv?league_id=${lg.id}`);

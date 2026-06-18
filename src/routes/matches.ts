@@ -22,6 +22,25 @@ matches.get("/calendar", async (c) => {
   return c.json(rows.results ?? []);
 });
 
+matches.get("/recent", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit")) || 10, 25);
+  const rows = await c.env.DB.prepare(
+    `SELECT m.id, m.match_date, m.status, l.name as league_name,
+      ht.name as home_name, at.name as away_name,
+      MAX(lr.submitted_at) as updated_at, COUNT(lr.id) as lines_scored
+    FROM matches m
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN leagues l ON l.id = m.league_id
+    JOIN match_lines ml ON ml.match_id = m.id
+    JOIN line_results lr ON lr.match_line_id = ml.id
+    GROUP BY m.id
+    ORDER BY updated_at DESC
+    LIMIT ?`
+  ).bind(limit).all();
+  return c.json(rows.results ?? []);
+});
+
 matches.get("/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const match = await c.env.DB.prepare(
