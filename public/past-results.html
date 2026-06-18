@@ -7,18 +7,12 @@ import { api, page, esc } from "/js/ui.js";
 const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
 
 page("Past Match Results", `<h1 class="text-2xl font-bold mb-2">Past Match Results</h1>
-<p class="text-slate-500 mb-4">Browse all recorded matches and view scores.</p>
+<p class="text-slate-500 mb-4">Matches with submitted scores only.</p>
 <select id="league" class="border rounded-lg px-3 py-2 mb-4">
   <option value="">All divisions</option>
   ${leagues.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}
 </select>
 <div id="list" class="bg-white rounded-xl border overflow-hidden"></div>`, "Past Match Results");
-
-function statusLabel(m) {
-  if (m.status === "completed") return `<span class="text-green-700 font-medium">Final</span>`;
-  if (m.lines_scored > 0) return `<span class="text-amber-700">${m.lines_scored}/${m.total_lines} lines</span>`;
-  return `<span class="text-slate-400">No scores</span>`;
-}
 
 async function load() {
   const leagueId = document.getElementById("league").value;
@@ -27,14 +21,13 @@ async function load() {
   document.getElementById("list").innerHTML = matches.length
     ? `<table class="w-full text-sm"><thead class="bg-slate-100"><tr>
       <th class="p-3 text-left">Date</th><th class="p-3 text-left">Division</th>
-      <th class="p-3 text-left">Match</th><th class="p-3">Status</th></tr></thead><tbody>${
+      <th class="p-3 text-left">Match</th></tr></thead><tbody>${
       matches.map((m) => `<tr class="border-t hover:bg-slate-50">
         <td class="p-3 whitespace-nowrap">${m.match_date}</td>
         <td class="p-3 text-slate-500">${esc(m.league_name)}</td>
-        <td class="p-3"><a href="/match.html?id=${m.id}" class="text-emerald-700 font-medium hover:underline">${esc(m.home_name)} vs ${esc(m.away_name)}</a></td>
-        <td class="p-3 text-center">${statusLabel(m)}</td></tr>`).join("")
+        <td class="p-3"><a href="/match.html?id=${m.id}" class="text-emerald-700 font-medium hover:underline">${esc(m.home_name)} vs ${esc(m.away_name)}</a></td></tr>`).join("")
     }</tbody></table>`
-    : `<p class="p-8 text-center text-slate-400">No matches yet.</p>`;
+    : `<p class="p-8 text-center text-slate-400">No submitted results yet.</p>`;
 }
 
 document.getElementById("league").onchange = load;
