@@ -7,7 +7,7 @@ import { api, page, esc, downloadCsv } from "/js/ui.js";
 const leagues = (await api("/admin/leagues")).sort((a, b) => a.name.localeCompare(b.name));
 
 function wlt(w, l, t) {
-  return `<span class="text-green-700">${w}</span>-<span class="text-red-600">${l}</span>${t ? `-<span class="text-slate-500">${t}</span>` : ""}`;
+  return `<span class="text-green-700">${w}</span>-<span class="text-red-600">${l}</span>-<span class="text-slate-500">${t}</span>`;
 }
 
 function renderTable(standings) {
