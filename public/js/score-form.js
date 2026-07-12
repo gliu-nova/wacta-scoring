@@ -4,8 +4,8 @@ function setInputs(line, r, n) {
   const h = r?.["home_set" + n];
   const a = r?.["away_set" + n];
   return `<div class="grid grid-cols-3 gap-2 text-sm items-center"><span>Set ${n}</span>
-    <input name="h${n}_${line.id}" type="number" min="0" value="${h ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-    <input name="a${n}_${line.id}" type="number" min="0" value="${a ?? ""}" placeholder="—" class="border rounded px-2 py-1"></div>`;
+    <input name="h${n}_${line.id}" type="number" min="0" value="${h ?? ""}" placeholder="6" class="border rounded px-2 py-1">
+    <input name="a${n}_${line.id}" type="number" min="0" value="${a ?? ""}" placeholder="3" class="border rounded px-2 py-1"></div>`;
 }
 
 export function renderLineCards(lineData, homeName, awayName) {
@@ -30,11 +30,11 @@ export function renderLineCards(lineData, homeName, awayName) {
           </label>
         </div>
       </div>
-      <p class="text-xs text-slate-400 mb-2">Set scores optional — e.g. 4-6, 6-2, 1-0</p>
+      <p class="text-xs text-slate-400 mb-2">Set scores optional — enter game counts in either order (e.g. 6 and 3). The line winner is credited with the higher total.</p>
       ${setInputs(line, r, 1)}${setInputs(line, r, 2)}
       <div class="grid grid-cols-3 gap-2 text-sm items-center mt-2"><span>Set 3</span>
-        <input name="h3_${line.id}" type="number" min="0" value="${r?.home_set3 ?? ""}" placeholder="—" class="border rounded px-2 py-1">
-        <input name="a3_${line.id}" type="number" min="0" value="${r?.away_set3 ?? ""}" placeholder="—" class="border rounded px-2 py-1"></div>
+        <input name="h3_${line.id}" type="number" min="0" value="${r?.home_set3 ?? ""}" placeholder="6" class="border rounded px-2 py-1">
+        <input name="a3_${line.id}" type="number" min="0" value="${r?.away_set3 ?? ""}" placeholder="3" class="border rounded px-2 py-1"></div>
       <div class="mt-4 pt-3 border-t">
         <p class="text-xs text-slate-400 mb-2">Who played (optional)</p>
         <div class="grid sm:grid-cols-2 gap-3">

@@ -1,6 +1,9 @@
 import type { LineResult, Side, TeamStanding } from "../types";
 import { setWinner } from "./validation";
 
+/** Games won/lost for a side. Set scores are order-independent: the line winner
+ *  gets the higher game count in each set, the loser the lower (e.g. winner +
+ *  6-3 6-2 → 12 games to 5). Ties keep the entered home/away split. */
 export function countGames(r: LineResult, side: Side): [number, number] {
   const sets: [number, number, number | null, number | null][] = [
     [r.home_set1, r.away_set1, r.home_tb1, r.away_tb1],
@@ -10,8 +13,16 @@ export function countGames(r: LineResult, side: Side): [number, number] {
   let won = 0, lost = 0;
   for (const [h, a, htb, atb] of sets) {
     const sw = setWinner(h, a, htb, atb);
-    const [hg, ag] = h === 6 && a === 6 ? (sw === "home" ? [7, 6] : [6, 7]) : [h, a];
-    if (side === "home") { won += hg; lost += ag; } else { won += ag; lost += hg; }
+    const [hg, ag] = h === 6 && a === 6
+      ? (sw === "home" ? [7, 6] : sw === "away" ? [6, 7] : [6, 6])
+      : [h, a];
+    if (r.winner === "tie") {
+      if (side === "home") { won += hg; lost += ag; } else { won += ag; lost += hg; }
+    } else {
+      const high = Math.max(hg, ag);
+      const low = Math.min(hg, ag);
+      if (side === r.winner) { won += high; lost += low; } else { won += low; lost += high; }
+    }
   }
   return [won, lost];
 }
