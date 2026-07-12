@@ -34,19 +34,23 @@ const emptyStanding = (id: number, name: string): TeamStanding => ({
   games_won: 0, games_lost: 0, match_win_pct: 0, game_win_pct: 0,
 });
 
-export async function computeStandings(db: D1Database, leagueId: number): Promise<TeamStanding[]> {
-  const teams = await db.prepare("SELECT id, name FROM teams WHERE league_id = ?").bind(leagueId).all<{ id: number; name: string }>();
-  const map = new Map<number, TeamStanding>();
-  for (const t of teams.results ?? []) map.set(t.id, emptyStanding(t.id, t.name));
+export type StandingMatchInput = {
+  home_team_id: number;
+  away_team_id: number;
+  lines: LineResult[];
+};
 
-  const matches = await db.prepare("SELECT * FROM matches WHERE league_id = ? AND status = 'completed'").bind(leagueId).all();
-  for (const m of matches.results ?? []) {
-    const match = m as { id: number; home_team_id: number; away_team_id: number };
-    const lines = await db.prepare("SELECT id FROM match_lines WHERE match_id = ?").bind(match.id).all<{ id: number }>();
+/** Pure standings from in-memory match/line results (for tests and DB-backed compute). */
+export function computeStandingsFromMatches(
+  teams: { id: number; name: string }[],
+  matches: StandingMatchInput[],
+): TeamStanding[] {
+  const map = new Map<number, TeamStanding>();
+  for (const t of teams) map.set(t.id, emptyStanding(t.id, t.name));
+
+  for (const match of matches) {
     let homeLines = 0, awayLines = 0, lineResults = 0;
-    for (const line of lines.results ?? []) {
-      const r = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(line.id).first<LineResult>();
-      if (!r) continue;
+    for (const r of match.lines) {
       lineResults++;
       const [hw, hl] = countGames(r, "home");
       const [aw, al] = countGames(r, "away");
@@ -82,4 +86,21 @@ export async function computeStandings(db: D1Database, leagueId: number): Promis
   return standings.sort((a, b) =>
     b.match_wins - a.match_wins || b.match_ties - a.match_ties
     || b.game_win_pct - a.game_win_pct || a.team_name.localeCompare(b.team_name));
+}
+
+export async function computeStandings(db: D1Database, leagueId: number): Promise<TeamStanding[]> {
+  const teams = await db.prepare("SELECT id, name FROM teams WHERE league_id = ?").bind(leagueId).all<{ id: number; name: string }>();
+  const matches = await db.prepare("SELECT * FROM matches WHERE league_id = ? AND status = 'completed'").bind(leagueId).all();
+  const inputs: StandingMatchInput[] = [];
+  for (const m of matches.results ?? []) {
+    const match = m as { id: number; home_team_id: number; away_team_id: number };
+    const lines = await db.prepare("SELECT id FROM match_lines WHERE match_id = ?").bind(match.id).all<{ id: number }>();
+    const results: LineResult[] = [];
+    for (const line of lines.results ?? []) {
+      const r = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(line.id).first<LineResult>();
+      if (r) results.push(r);
+    }
+    inputs.push({ home_team_id: match.home_team_id, away_team_id: match.away_team_id, lines: results });
+  }
+  return computeStandingsFromMatches(teams.results ?? [], inputs);
 }
