@@ -1,5 +1,5 @@
 import { computeStandings, countGames } from "./standings";
-import type { League, LineResult, Player } from "../types";
+import type { League, LineResult, Lineup, Player } from "../types";
 
 function csvCell(value: string | number | null | undefined): string {
   const s = String(value ?? "");
@@ -37,6 +37,27 @@ function formatLineScore(r: LineResult): string {
     parts.push(set(r.home_set3, r.away_set3, r.home_tb3, r.away_tb3));
   }
   return parts.join(" ");
+}
+
+function playerName(pmap: Map<number, Player>, id: number | null | undefined): string {
+  if (!id) return "";
+  const p = pmap.get(id);
+  return p ? `${p.first_name} ${p.last_name}` : "";
+}
+
+/** Home/away player names for a line; empty strings when none were submitted. */
+function lineupSideNames(
+  lu: Lineup | null | undefined,
+  side: "home" | "away",
+  pmap: Map<number, Player>,
+): string {
+  if (!lu) return "";
+  const text = side === "home" ? lu.home_players_text : lu.away_players_text;
+  if (text?.trim()) return text.trim();
+  const ids = side === "home"
+    ? [lu.home_player1_id, lu.home_player2_id]
+    : [lu.away_player1_id, lu.away_player2_id];
+  return ids.map((id) => playerName(pmap, id)).filter(Boolean).join(", ");
 }
 
 function formatOverall(
@@ -78,7 +99,7 @@ function buildMatchHeader(lineCols: LineColumn[], includeLeague: boolean): strin
   if (includeLeague) header.unshift("League");
   for (let i = 0; i < lineCols.length; i++) {
     const label = lineCols[i].name ? `D${i + 1} (${lineCols[i].name})` : `D${i + 1}`;
-    header.push(`${label} Winner`, `${label} Score`);
+    header.push(`${label} Winner`, `${label} Score`, `${label} Home Players`, `${label} Away Players`);
   }
   header.push("Overall", "Games won");
   return header;
@@ -127,10 +148,12 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
   if (leagueId) { sql += " AND m.league_id = ?"; binds.push(leagueId); }
   sql += " ORDER BY m.match_date DESC, m.id DESC";
 
-  const [matches, lineCols] = await Promise.all([
+  const [matches, lineCols, allPlayers] = await Promise.all([
     db.prepare(sql).bind(...binds).all(),
     getLineColumns(db, leagueId),
+    db.prepare("SELECT * FROM players").all<Player>(),
   ]);
+  const pmap = new Map((allPlayers.results ?? []).map((p) => [p.id, p]));
   const includeLeague = !leagueId;
   const rows = [csvRow(buildMatchHeader(lineCols, includeLeague))];
 
@@ -140,6 +163,7 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
     };
     const lines = await db.prepare("SELECT * FROM match_lines WHERE match_id = ? ORDER BY sort_order").bind(match.id).all();
     const resultsByOrder = new Map<number, LineResult>();
+    const lineupsByOrder = new Map<number, Lineup | null>();
     let homeW = 0, homeL = 0, homeT = 0, awayW = 0, awayL = 0, awayT = 0;
     let homeGames = 0, awayGames = 0;
 
@@ -148,6 +172,8 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
       const result = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(l.id).first<LineResult>();
       if (!result) continue;
       resultsByOrder.set(l.sort_order, result);
+      const lineup = await db.prepare("SELECT * FROM lineups WHERE match_line_id = ?").bind(l.id).first<Lineup>();
+      lineupsByOrder.set(l.sort_order, lineup);
       const [hg, ag] = countGames(result, "home");
       homeGames += hg;
       awayGames += ag;
@@ -162,10 +188,13 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
     for (const col of lineCols) {
       const result = resultsByOrder.get(col.sort_order);
       if (result) {
+        const lu = lineupsByOrder.get(col.sort_order);
         row.push(lineWinnerLabel(result.winner, match.home_name, match.away_name));
         row.push(formatLineScore(result));
+        row.push(lineupSideNames(lu, "home", pmap));
+        row.push(lineupSideNames(lu, "away", pmap));
       } else {
-        row.push("", "");
+        row.push("", "", "", "");
       }
     }
     row.push(
