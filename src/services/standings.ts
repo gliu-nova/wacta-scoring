@@ -1,17 +1,12 @@
-import type { LineResult, Side, TeamStanding } from "../types";
+import type { LineResult, LineWinner, Side, TeamStanding } from "../types";
 import { setWinner } from "./validation";
 
 /** Games won/lost for a side. Set scores are order-independent: the line winner
  *  gets the higher game count in each set, the loser the lower (e.g. winner +
  *  6-3 6-2 → 12 games to 5). Ties keep the entered home/away split. */
 export function countGames(r: LineResult, side: Side): [number, number] {
-  const sets: [number, number, number | null, number | null][] = [
-    [r.home_set1, r.away_set1, r.home_tb1, r.away_tb1],
-    [r.home_set2, r.away_set2, r.home_tb2, r.away_tb2],
-  ];
-  if (r.home_set3 != null && r.away_set3 != null) sets.push([r.home_set3, r.away_set3, r.home_tb3, r.away_tb3]);
   let won = 0, lost = 0;
-  for (const [h, a, htb, atb] of sets) {
+  for (const [h, a, htb, atb] of lineSets(r)) {
     const sw = setWinner(h, a, htb, atb);
     const [hg, ag] = h === 6 && a === 6
       ? (sw === "home" ? [7, 6] : sw === "away" ? [6, 7] : [6, 6])
@@ -25,6 +20,53 @@ export function countGames(r: LineResult, side: Side): [number, number] {
     }
   }
   return [won, lost];
+}
+
+function lineSets(r: LineResult): [number, number, number | null, number | null][] {
+  const sets: [number, number, number | null, number | null][] = [
+    [r.home_set1, r.away_set1, r.home_tb1, r.away_tb1],
+    [r.home_set2, r.away_set2, r.home_tb2, r.away_tb2],
+  ];
+  if (r.home_set3 != null && r.away_set3 != null) sets.push([r.home_set3, r.away_set3, r.home_tb3, r.away_tb3]);
+  return sets;
+}
+
+/** Sets won by home and away on a line. A line win is 2-0, or 2-1 when a third
+ *  set was played (independent of box order). Tied lines use entered set winners. */
+export function countSets(r: LineResult): [number, number] {
+  if (r.winner === "tie") {
+    let home = 0, away = 0;
+    for (const [h, a, htb, atb] of lineSets(r)) {
+      const w = setWinner(h, a, htb, atb);
+      if (w === "home") home++;
+      else if (w === "away") away++;
+    }
+    return [home, away];
+  }
+  const third = r.home_set3 != null && r.away_set3 != null;
+  const winnerSets = 2;
+  const loserSets = third ? 1 : 0;
+  return r.winner === "home" ? [winnerSets, loserSets] : [loserSets, winnerSets];
+}
+
+/** Match winner from line wins, then sets, then games. Equal on all three is a tie. */
+export function matchWinner(lines: LineResult[]): LineWinner {
+  let homeLines = 0, awayLines = 0;
+  let homeSets = 0, awaySets = 0;
+  let homeGames = 0, awayGames = 0;
+  for (const r of lines) {
+    if (r.winner === "home") homeLines++;
+    else if (r.winner === "away") awayLines++;
+    const [hs, as] = countSets(r);
+    homeSets += hs;
+    awaySets += as;
+    homeGames += countGames(r, "home")[0];
+    awayGames += countGames(r, "away")[0];
+  }
+  if (homeLines !== awayLines) return homeLines > awayLines ? "home" : "away";
+  if (homeSets !== awaySets) return homeSets > awaySets ? "home" : "away";
+  if (homeGames !== awayGames) return homeGames > awayGames ? "home" : "away";
+  return "tie";
 }
 
 const emptyStanding = (id: number, name: string): TeamStanding => ({
@@ -49,7 +91,7 @@ export function computeStandingsFromMatches(
   for (const t of teams) map.set(t.id, emptyStanding(t.id, t.name));
 
   for (const match of matches) {
-    let homeLines = 0, awayLines = 0, lineResults = 0;
+    let lineResults = 0;
     for (const r of match.lines) {
       lineResults++;
       const [hw, hl] = countGames(r, "home");
@@ -57,10 +99,8 @@ export function computeStandingsFromMatches(
       map.get(match.home_team_id)!.games_won += hw; map.get(match.home_team_id)!.games_lost += hl;
       map.get(match.away_team_id)!.games_won += aw; map.get(match.away_team_id)!.games_lost += al;
       if (r.winner === "home") {
-        homeLines++;
         map.get(match.home_team_id)!.line_wins++; map.get(match.away_team_id)!.line_losses++;
       } else if (r.winner === "away") {
-        awayLines++;
         map.get(match.away_team_id)!.line_wins++; map.get(match.home_team_id)!.line_losses++;
       } else {
         map.get(match.home_team_id)!.line_ties++; map.get(match.away_team_id)!.line_ties++;
@@ -69,9 +109,10 @@ export function computeStandingsFromMatches(
     if (lineResults === 0) continue;
     map.get(match.home_team_id)!.matches_played++;
     map.get(match.away_team_id)!.matches_played++;
-    if (homeLines > awayLines) {
+    const winner = matchWinner(match.lines);
+    if (winner === "home") {
       map.get(match.home_team_id)!.match_wins++; map.get(match.away_team_id)!.match_losses++;
-    } else if (awayLines > homeLines) {
+    } else if (winner === "away") {
       map.get(match.away_team_id)!.match_wins++; map.get(match.home_team_id)!.match_losses++;
     } else {
       map.get(match.home_team_id)!.match_ties++; map.get(match.away_team_id)!.match_ties++;

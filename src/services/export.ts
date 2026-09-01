@@ -1,4 +1,4 @@
-import { computeStandings, countGames } from "./standings";
+import { computeStandings, countGames, matchWinner } from "./standings";
 import type { League, LineResult, Lineup, Player } from "../types";
 
 function csvCell(value: string | number | null | undefined): string {
@@ -64,10 +64,12 @@ function formatOverall(
   homeW: number, homeL: number, homeT: number,
   awayW: number, awayL: number, awayT: number,
   homeName: string, awayName: string,
+  outcome: "home" | "away" | "tie",
 ): string {
-  if (homeW > awayW) return `${homeName} wins ${homeW}-${homeL}-${homeT}`;
-  if (awayW > homeW) return `${awayName} wins ${awayW}-${awayL}-${awayT}`;
-  return `Tie ${homeW}-${homeL}-${homeT}`;
+  const score = `${homeW}-${homeL}-${homeT}`;
+  if (outcome === "home") return `${homeName} wins ${score}`;
+  if (outcome === "away") return `${awayName} wins ${awayW}-${awayL}-${awayT}`;
+  return `Tie ${score}`;
 }
 
 function formatGamesWon(homeName: string, homeGames: number, awayName: string, awayGames: number): string {
@@ -164,6 +166,7 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
     const lines = await db.prepare("SELECT * FROM match_lines WHERE match_id = ? ORDER BY sort_order").bind(match.id).all();
     const resultsByOrder = new Map<number, LineResult>();
     const lineupsByOrder = new Map<number, Lineup | null>();
+    const scoredLines: LineResult[] = [];
     let homeW = 0, homeL = 0, homeT = 0, awayW = 0, awayL = 0, awayT = 0;
     let homeGames = 0, awayGames = 0;
 
@@ -172,6 +175,7 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
       const result = await db.prepare("SELECT * FROM line_results WHERE match_line_id = ?").bind(l.id).first<LineResult>();
       if (!result) continue;
       resultsByOrder.set(l.sort_order, result);
+      scoredLines.push(result);
       const lineup = await db.prepare("SELECT * FROM lineups WHERE match_line_id = ?").bind(l.id).first<Lineup>();
       lineupsByOrder.set(l.sort_order, lineup);
       const [hg, ag] = countGames(result, "home");
@@ -198,7 +202,7 @@ export async function matchesCsv(db: D1Database, leagueId?: number): Promise<str
       }
     }
     row.push(
-      formatOverall(homeW, homeL, homeT, awayW, awayL, awayT, match.home_name, match.away_name),
+      formatOverall(homeW, homeL, homeT, awayW, awayL, awayT, match.home_name, match.away_name, matchWinner(scoredLines)),
       formatGamesWon(match.home_name, homeGames, match.away_name, awayGames),
     );
     rows.push(csvRow(row));

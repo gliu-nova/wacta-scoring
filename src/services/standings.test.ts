@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countGames, computeStandingsFromMatches } from "./standings";
+import { countGames, countSets, matchWinner, computeStandingsFromMatches } from "./standings";
 import type { LineResult } from "../types";
 
 function line(partial: Partial<LineResult> & Pick<LineResult, "winner">): LineResult {
@@ -13,6 +13,18 @@ function line(partial: Partial<LineResult> & Pick<LineResult, "winner">): LineRe
     submitted_at: "",
     ...partial,
   };
+}
+
+function twoSet(winner: "home" | "away", winGames = 6, loseGames = 4): LineResult {
+  return winner === "home"
+    ? line({ winner, home_set1: winGames, away_set1: loseGames, home_set2: winGames, away_set2: loseGames })
+    : line({ winner, home_set1: loseGames, away_set1: winGames, home_set2: loseGames, away_set2: winGames });
+}
+
+function threeSet(winner: "home" | "away"): LineResult {
+  return winner === "home"
+    ? line({ winner, home_set1: 6, away_set1: 4, home_set2: 3, away_set2: 6, home_set3: 6, away_set3: 2 })
+    : line({ winner, home_set1: 4, away_set1: 6, home_set2: 6, away_set2: 3, home_set3: 2, away_set3: 6 });
 }
 
 describe("countGames", () => {
@@ -76,6 +88,64 @@ describe("countGames", () => {
   });
 });
 
+describe("countSets", () => {
+  it("counts a two-set line win as 2-0 even if boxes are flipped", () => {
+    const normal = line({
+      winner: "away",
+      home_set1: 1, away_set1: 6,
+      home_set2: 2, away_set2: 6,
+    });
+    expect(countSets(normal)).toEqual([0, 2]);
+
+    const flipped = line({
+      winner: "away",
+      home_set1: 6, away_set1: 1,
+      home_set2: 6, away_set2: 2,
+    });
+    expect(countSets(flipped)).toEqual([0, 2]);
+  });
+
+  it("counts a three-set line as 2-1 for the line winner", () => {
+    const r = line({
+      winner: "home",
+      home_set1: 6, away_set1: 4,
+      home_set2: 3, away_set2: 6,
+      home_set3: 6, away_set3: 2,
+    });
+    expect(countSets(r)).toEqual([2, 1]);
+  });
+
+  it("counts set winners from entered scores on a tied line", () => {
+    const r = line({
+      winner: "tie",
+      home_set1: 6, away_set1: 4,
+      home_set2: 3, away_set2: 6,
+    });
+    expect(countSets(r)).toEqual([1, 1]);
+  });
+});
+
+describe("matchWinner", () => {
+  it("uses line wins when they are not tied", () => {
+    expect(matchWinner([twoSet("home"), twoSet("home"), twoSet("away")])).toBe("home");
+  });
+
+  it("breaks a 2-2 line tie by sets", () => {
+    const lines = [twoSet("home"), twoSet("home"), threeSet("away"), threeSet("away")];
+    expect(matchWinner(lines)).toBe("home"); // 6 sets to 4
+  });
+
+  it("breaks a 2-2 set tie by games", () => {
+    const lines = [twoSet("home", 6, 1), twoSet("home", 6, 1), twoSet("away", 6, 4), twoSet("away", 6, 4)];
+    expect(matchWinner(lines)).toBe("home");
+  });
+
+  it("is a match tie when lines, sets, and games are all even", () => {
+    const lines = [twoSet("home"), twoSet("home"), twoSet("away"), twoSet("away")];
+    expect(matchWinner(lines)).toBe("tie");
+  });
+});
+
 describe("computeStandingsFromMatches", () => {
   const teams = [
     { id: 1, name: "Home Team" },
@@ -120,11 +190,37 @@ describe("computeStandingsFromMatches", () => {
     expect(standings[0].team_id).toBe(2); // away ranked first
   });
 
-  it("records a match tie when line wins are equal", () => {
-    const lines = [
-      line({ winner: "home", home_set1: 6, away_set1: 3 }),
-      line({ winner: "away", home_set1: 2, away_set1: 6 }),
-    ];
+  it("awards a match win on a 2-2 when one team won more sets", () => {
+    const lines = [twoSet("home"), twoSet("home"), threeSet("away"), threeSet("away")];
+    const [home, away] = computeStandingsFromMatches(
+      teams.slice(0, 2),
+      [{ home_team_id: 1, away_team_id: 2, lines }],
+    ).sort((a, b) => a.team_id - b.team_id);
+
+    expect(home.line_wins).toBe(2);
+    expect(away.line_wins).toBe(2);
+    expect(home.match_wins).toBe(1);
+    expect(away.match_losses).toBe(1);
+    expect(home.match_ties).toBe(0);
+    expect(away.match_ties).toBe(0);
+  });
+
+  it("awards a match win on a 2-2 when sets are even but one team won more games", () => {
+    const lines = [twoSet("home", 6, 1), twoSet("home", 6, 1), twoSet("away", 6, 4), twoSet("away", 6, 4)];
+    const [home, away] = computeStandingsFromMatches(
+      teams.slice(0, 2),
+      [{ home_team_id: 1, away_team_id: 2, lines }],
+    ).sort((a, b) => a.team_id - b.team_id);
+
+    expect(home.line_wins).toBe(2);
+    expect(away.line_wins).toBe(2);
+    expect(home.match_wins).toBe(1);
+    expect(away.match_losses).toBe(1);
+    expect(home.match_ties).toBe(0);
+  });
+
+  it("records a match tie when 2-2 lines, sets, and games are all even", () => {
+    const lines = [twoSet("home"), twoSet("home"), twoSet("away"), twoSet("away")];
     const [home, away] = computeStandingsFromMatches(
       teams.slice(0, 2),
       [{ home_team_id: 1, away_team_id: 2, lines }],
