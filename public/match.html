@@ -54,7 +54,8 @@ if (!user) {
   document.getElementById("actions").innerHTML = `
     <a href="/lineup.html?id=${id}${activitySuffix}" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Edit Lineup</a>
     <a href="/scores.html?id=${id}${activitySuffix}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium">Edit Scores</a>
-    <button id="edit-match" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Edit Match Details</button>`;
+    <button id="edit-match" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Edit Match Details</button>
+    <button id="delete-match" class="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50">Delete Match</button>`;
   document.getElementById("edit-match").onclick = async () => {
     document.getElementById("edit-date").value = m.match_date;
     document.getElementById("edit-loc").value = m.location || "";
@@ -81,6 +82,13 @@ if (!user) {
       await api("/matches/" + id, { method: "PUT", body: JSON.stringify(body) });
       location.reload();
     } catch (e) { alert(document.getElementById("edit-msg"), e.message); }
+  };
+  document.getElementById("delete-match").onclick = async () => {
+    if (!confirm(`Delete ${m.home_name} vs ${m.away_name} on ${m.match_date}? This removes the result from standings and cannot be undone.`)) return;
+    try {
+      await api("/matches/" + id, { method: "DELETE" });
+      location.href = "/past-results.html";
+    } catch (e) { alert(document.getElementById("notice"), e.message); }
   };
 }
 document.getElementById("rows").innerHTML = data.lineData.map(({line,lineup,result}) => {

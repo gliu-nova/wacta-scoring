@@ -168,6 +168,36 @@ matches.put("/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+matches.delete("/:id", async (c) => {
+  const user = await getUser(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const matchId = Number(c.req.param("id"));
+  if (!Number.isInteger(matchId)) return c.json({ error: "Not found" }, 404);
+  const info = await c.env.DB.prepare(
+    `SELECT m.match_date, ht.name as home_name, at.name as away_name, l.name as league_name
+     FROM matches m
+     JOIN teams ht ON ht.id = m.home_team_id
+     JOIN teams at ON at.id = m.away_team_id
+     JOIN leagues l ON l.id = m.league_id
+     WHERE m.id = ?`
+  ).bind(matchId).first<{ match_date: string; home_name: string; away_name: string; league_name: string }>();
+  if (!info) return c.json({ error: "Not found" }, 404);
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "DELETE FROM line_results WHERE match_line_id IN (SELECT id FROM match_lines WHERE match_id = ?)"
+    ).bind(matchId),
+    c.env.DB.prepare(
+      "DELETE FROM lineups WHERE match_line_id IN (SELECT id FROM match_lines WHERE match_id = ?)"
+    ).bind(matchId),
+    c.env.DB.prepare("DELETE FROM match_lines WHERE match_id = ?").bind(matchId),
+    c.env.DB.prepare("DELETE FROM matches WHERE id = ?").bind(matchId),
+  ]);
+  await logActivity(c.env.DB, user, `Deleted match results: ${info.home_name} vs ${info.away_name}`, undefined, {
+    subtitle: `${info.league_name} · ${info.match_date}`,
+  });
+  return c.json({ ok: true });
+});
+
 matches.post("/", async (c) => {
   const user = await getUser(c);
   if (!user) return c.json({ error: "Unauthorized" }, 401);
